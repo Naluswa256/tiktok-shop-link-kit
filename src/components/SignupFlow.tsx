@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Input } from '@/components/tiktok-commerce';
 import { ArrowRight, ArrowLeft, Check, Phone, AtSign, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 type Step = 1 | 2 | 3;
 
 export const SignupFlow = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [formData, setFormData] = useState({
     tiktokHandle: '',
@@ -52,9 +54,8 @@ export const SignupFlow = () => {
   };
 
   const handleCompleteSetup = () => {
-    // Navigate to the shop page or show success message
-    alert('Setup completed! Your shop link is ready to share.');
-    console.log('Shop setup completed for:', getShopUrl());
+    // Navigate to the subscription page
+    navigate('/subscription');
   };
 
   const handleVisitLink = () => {

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { SignupFlow } from '@/components/SignupFlow';
 import { FeatureCard } from '@/components/FeatureCard';
-import { PhoneMockup } from '@/components/PhoneMockup';
+import { ProductCatalogPreview } from '@/components/ProductCatalogPreview';
 import { ScrollText, MessageCircle, Eye, ArrowRight, Sparkles } from 'lucide-react';
 
 const Index = () => {
@@ -138,19 +138,23 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Phone Mockup Preview */}
+      {/* Product Catalog Preview */}
       <section className="py-xl bg-muted/30">
         <div className="text-center space-y-lg">
           <div className="space-y-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              Your Shop Link Preview
+              Your Shop Preview
             </h2>
             <p className="text-sm text-muted-foreground">
-              See how your customers will experience your store
+              Interactive product tiles from your TikTok videos
             </p>
           </div>
           
-          <PhoneMockup />
+          <ProductCatalogPreview />
+          
+          <p className="text-xs text-muted-foreground">
+            Hover over products to see interactions
+          </p>
         </div>
       </section>
 

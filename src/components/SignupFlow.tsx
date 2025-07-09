@@ -51,6 +51,18 @@ export const SignupFlow = () => {
     return `tiktokshop.ug/shop/${handle}`;
   };
 
+  const handleCompleteSetup = () => {
+    // Navigate to the shop page or show success message
+    alert('Setup completed! Your shop link is ready to share.');
+    console.log('Shop setup completed for:', getShopUrl());
+  };
+
+  const handleVisitLink = () => {
+    // Open the shop link in a new tab
+    const handle = formData.tiktokHandle.replace('@', '');
+    window.open(`/shop/${handle}`, '_blank');
+  };
+
   return (
     <div className="max-w-md mx-auto">
       <Card className="overflow-hidden">
@@ -159,7 +171,7 @@ export const SignupFlow = () => {
                   <p className="text-sm font-medium">Your Shop Link:</p>
                   <div className="flex items-center gap-sm p-sm bg-background rounded-ds-sm border">
                     <code className="text-sm text-primary flex-1">{getShopUrl()}</code>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={handleVisitLink}>
                       <ExternalLink className="w-4 h-4" />
                     </Button>
                   </div>
@@ -169,7 +181,7 @@ export const SignupFlow = () => {
                 </div>
 
                 <div className="text-center">
-                  <Button variant="primary" size="block">
+                  <Button variant="primary" size="block" onClick={handleCompleteSetup}>
                     Complete Setup
                   </Button>
                 </div>

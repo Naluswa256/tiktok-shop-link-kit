@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleSendOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
@@ -55,12 +57,22 @@ const Login = () => {
     // Simulate API call to verify OTP
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    // Mock user data - in real app this would come from API
+    const userData = {
+      id: '1',
+      phoneNumber: `+256${phoneNumber}`,
+      tiktokHandle: '@nalu-fashion',
+      shopHandle: 'nalu-fashion'
+    };
+    
+    login(userData);
+    
     setIsLoading(false);
     setStep('success');
     
-    // Simulate successful login - redirect to shop after success message
+    // Redirect to seller dashboard after success message
     setTimeout(() => {
-      navigate('/shop/nalu-fashion');
+      navigate('/dashboard');
     }, 2000);
   };
 
@@ -212,7 +224,7 @@ const Login = () => {
               <div className="space-y-sm">
                 <h2 className="text-xl font-bold text-success">Login Successful!</h2>
                 <p className="text-muted-foreground">
-                  Redirecting you to your shop...
+                  Redirecting you to your dashboard...
                 </p>
               </div>
             </CardContent>

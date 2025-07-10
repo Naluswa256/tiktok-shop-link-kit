@@ -8,6 +8,7 @@ import { HowItWorks } from '@/components/HowItWorks';
 import { ScrollText, MessageCircle, Eye, ArrowRight, Sparkles, Play } from 'lucide-react';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [showSignup, setShowSignup] = useState(false);
 
   const scrollToSignup = () => {
@@ -25,7 +26,11 @@ const Index = () => {
         <Header 
           title="BuyLink UG" 
           actions={
-            <Button variant="ghost" size="sm">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/login')}
+            >
               Sign In
             </Button>
           }

@@ -1,15 +1,15 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
 import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const Shop = () => {
   const navigate = useNavigate();
+  const { handle } = useParams<{ handle: string }>();
   
-  // This would typically come from URL params or props
-  const shopHandle = 'nalu-fashion';
+  const shopHandle = handle || 'unknown';
   const hasProducts = false; // Simulate no products yet
 
   return (

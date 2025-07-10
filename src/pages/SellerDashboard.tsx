@@ -1,16 +1,15 @@
-
 import React, { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
-import { MessageCircle, Share2, Search, Eye, Video, Filter, ChevronDown, LogIn } from 'lucide-react';
+import { MessageCircle, Share2, Search, Eye, Video, ToggleLeft, ToggleRight, Filter, ChevronDown, LogOut, ExternalLink, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock product data with enhanced visual appeal
+// Mock product data - same as ProductCatalog but with seller controls
 const mockProducts = [
   {
     id: '1',
@@ -71,51 +70,32 @@ const mockProducts = [
     tiktokUrl: 'https://tiktok.com/@nalu-fashion/video/126',
     isOutOfStock: false,
     views: 67
-  },
-  {
-    id: '5',
-    title: 'Casual Sneakers',
-    price: '75000',
-    currency: 'UGX',
-    tags: ['shoes', 'sneakers', 'casual'],
-    sizes: ['38', '39', '40', '41', '42'],
-    images: [
-      'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop'
-    ],
-    tiktokUrl: 'https://tiktok.com/@nalu-fashion/video/127',
-    isOutOfStock: false,
-    views: 98
-  },
-  {
-    id: '6',
-    title: 'Evening Clutch',
-    price: '35000',
-    currency: 'UGX',
-    tags: ['bags', 'accessories', 'evening'],
-    sizes: ['One Size'],
-    images: [
-      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop'
-    ],
-    tiktokUrl: 'https://tiktok.com/@nalu-fashion/video/128',
-    isOutOfStock: false,
-    views: 123
   }
 ];
 
-const ProductCatalog = () => {
-  const { handle } = useParams<{ handle: string }>();
-  const { user } = useAuth();
+const SellerDashboard = () => {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [products, setProducts] = useState(mockProducts);
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
-  
-  // Check if this is the seller's own page
-  const isOwner = user && user.shopHandle === handle;
-  
-  const hasProducts = products.length > 0;
+
+  // Redirect if not authenticated
+  React.useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
+  if (!user) {
+    return null; // Will redirect
+  }
+
   const totalViews = products.reduce((sum, product) => sum + product.views, 0);
+  const activeProducts = products.filter(p => !p.isOutOfStock).length;
+  const outOfStockProducts = products.filter(p => p.isOutOfStock).length;
 
   // Get all unique tags
   const allTags = useMemo(() => {
@@ -126,7 +106,7 @@ const ProductCatalog = () => {
     return Array.from(tags);
   }, [products]);
 
-  // Filter products (no seller controls in public view)
+  // Filter products
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,10 +116,42 @@ const ProductCatalog = () => {
     });
   }, [products, searchTerm, selectedTag]);
 
-  const handleWhatsAppMessage = (product: typeof mockProducts[0]) => {
-    const message = `Hi! I'm interested in "${product.title}" for ${product.currency} ${parseInt(product.price).toLocaleString()}. Is it still available?`;
-    const whatsappUrl = `https://wa.me/256700000000?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+  const toggleOutOfStock = (productId: string) => {
+    setProducts(prev => prev.map(product => 
+      product.id === productId 
+        ? { ...product, isOutOfStock: !product.isOutOfStock }
+        : product
+    ));
+    
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      toast({
+        title: product.isOutOfStock ? "Product marked as available" : "Product marked as out of stock",
+        description: `"${product.title}" status updated`,
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+    toast({
+      title: "Logged out successfully",
+      description: "You have been signed out of your account",
+    });
+  };
+
+  const viewPublicShop = () => {
+    window.open(`/shop/${user.shopHandle}`, '_blank');
+  };
+
+  const shareShopLink = () => {
+    const shopUrl = `${window.location.origin}/shop/${user.shopHandle}`;
+    navigator.clipboard.writeText(shopUrl);
+    toast({
+      title: "Shop link copied!",
+      description: "Share this link to let customers browse your products",
+    });
   };
 
   const nextImage = (productId: string, maxImages: number) => {
@@ -149,101 +161,30 @@ const ProductCatalog = () => {
     }));
   };
 
-  const handleSignIn = () => {
-    navigate('/login');
-  };
-
-  if (!hasProducts) {
-    return (
-      <Layout
-        header={
-          <Header 
-            title={`@${handle}`}
-            actions={
-              <div className="flex items-center gap-sm">
-                <PageViewCounter count={0} />
-                <Button variant="ghost" size="sm">
-                  <Share2 className="w-4 h-4" />
-                </Button>
-              </div>
-            }
-          />
-        }
-      >
-        <div className="space-y-lg">
-          {/* Shop Header */}
-          <div className="text-center space-y-sm bg-gradient-to-br from-primary/5 to-accent/5 py-xl rounded-lg">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <span className="text-2xl font-bold text-white">
-                {handle?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              @{handle}'s Shop
-            </h1>
-            <p className="text-sm text-muted-foreground font-mono bg-muted/50 px-3 py-1 rounded-full inline-block">
-              buylink.ug/shop/{handle}
-            </p>
-          </div>
-
-          {/* Empty State */}
-          <Card className="mx-auto max-w-md border-dashed border-2">
-            <CardContent className="p-xl text-center space-y-lg">
-              <div className="w-24 h-24 bg-gradient-to-br from-muted to-muted/50 rounded-2xl flex items-center justify-center mx-auto">
-                <Eye className="w-10 h-10 text-muted-foreground" />
-              </div>
-              
-              <div className="space-y-sm">
-                <h2 className="text-xl font-bold text-foreground">
-                  No products yet
-                </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Post a TikTok video with <span className="font-bold text-primary">#TRACK</span> to automatically list your first product!
-                </p>
-              </div>
-
-              <Button variant="primary" size="lg" className="w-full">
-                Learn How It Works
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout
       header={
         <Header 
-          title={`@${handle}`}
+          title="Seller Dashboard"
           actions={
             <div className="flex items-center gap-sm">
-              <PageViewCounter count={totalViews} />
-              {!user && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={handleSignIn}
-                  className="gap-2"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </Button>
-              )}
-              {!user && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={handleSignIn}
-                  className="gap-2"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </Button>
-              )}
-              <Button variant="ghost" size="sm">
-                <Share2 className="w-4 h-4" />
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={viewPublicShop}
+                className="gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Shop
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleLogout}
+                className="gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
               </Button>
             </div>
           }
@@ -251,23 +192,44 @@ const ProductCatalog = () => {
       }
     >
       <div className="space-y-lg">
-        {/* Shop Header */}
-        <div className="text-center space-y-sm bg-gradient-to-br from-primary/5 to-accent/5 py-lg rounded-lg">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto shadow-lg">
-            <span className="text-xl font-bold text-white">
-              {handle?.charAt(0).toUpperCase()}
-            </span>
+        {/* Dashboard Header */}
+        <div className="bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg p-lg">
+          <div className="flex items-center justify-between mb-md">
+            <div>
+              <h1 className="text-xl font-bold text-foreground">
+                Welcome back, {user.tiktokHandle}!
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Manage your shop and track your sales
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Your shop link:</p>
+              <div className="flex items-center gap-2">
+                <code className="text-sm font-mono bg-background px-2 py-1 rounded">
+                  buylink.ug/shop/{user.shopHandle}
+                </code>
+                <Button variant="ghost" size="sm" onClick={shareShopLink}>
+                  <Share2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-foreground">
-            @{handle}'s Shop
-          </h1>
-          <p className="text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-1 rounded-full inline-block">
-            tiktokshop.ug/shop/{handle}
-          </p>
-          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-            <span>{filteredProducts.length} Products</span>
-            <span>•</span>
-            <span>{totalViews} Total Views</span>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-md">
+            <div className="bg-background/50 rounded-lg p-md text-center">
+              <div className="text-2xl font-bold text-foreground">{products.length}</div>
+              <div className="text-xs text-muted-foreground">Total Products</div>
+            </div>
+            <div className="bg-background/50 rounded-lg p-md text-center">
+              <div className="text-2xl font-bold text-success">{activeProducts}</div>
+              <div className="text-xs text-muted-foreground">Available</div>
+            </div>
+            <div className="bg-background/50 rounded-lg p-md text-center">
+              <div className="text-2xl font-bold text-warning">{outOfStockProducts}</div>
+              <div className="text-xs text-muted-foreground">Out of Stock</div>
+            </div>
           </div>
         </div>
 
@@ -276,14 +238,13 @@ const ProductCatalog = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search products..."
+              placeholder="Search your products..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-12 bg-muted/30 border-0 focus:bg-background"
             />
           </div>
           
-          {/* Tag Filter Dropdown */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <Select value={selectedTag} onValueChange={setSelectedTag}>
@@ -341,7 +302,21 @@ const ProductCatalog = () => {
                   </div>
                 )}
                 
-                {/* No seller controls in public view */}
+                {/* Stock Toggle */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleOutOfStock(product.id);
+                  }}
+                  className="absolute top-2 left-2 p-1 bg-white/90 rounded-full backdrop-blur-sm hover:bg-white transition-colors"
+                  title={product.isOutOfStock ? "Mark as available" : "Mark as out of stock"}
+                >
+                  {product.isOutOfStock ? (
+                    <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ToggleRight className="w-4 h-4 text-success" />
+                  )}
+                </button>
               </div>
               
               <CardContent className="p-3 space-y-2">
@@ -361,47 +336,25 @@ const ProductCatalog = () => {
                   <span>{product.views} views</span>
                 </div>
                 
-                {/* Sizes */}
-                {product.sizes.length > 0 && product.sizes[0] !== 'One Size' && (
-                  <div className="flex flex-wrap gap-1">
-                    {product.sizes.slice(0, 3).map(size => (
-                      <Badge key={size} variant="outline" className="text-xs px-1 py-0">
-                        {size}
-                      </Badge>
-                    ))}
-                    {product.sizes.length > 3 && (
-                      <Badge variant="outline" className="text-xs px-1 py-0">
-                        +{product.sizes.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                )}
-                
-                {/* TikTok Link */}
-                <div className="bg-muted/50 rounded-md p-2 text-xs">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Video className="w-3 h-3" />
-                    <span className="font-medium">TikTok Video</span>
-                  </div>
-                  <button
-                    onClick={() => window.open(product.tiktokUrl, '_blank')}
-                    className="text-primary hover:text-primary/80 font-medium text-left line-clamp-1"
+                {/* Status Badge */}
+                <div className="flex items-center justify-between">
+                  <Badge 
+                    variant={product.isOutOfStock ? "destructive" : "default"}
+                    className="text-xs"
                   >
-                    Watch the original video of this product
-                  </button>
+                    {product.isOutOfStock ? "Out of Stock" : "Available"}
+                  </Badge>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open(product.tiktokUrl, '_blank')}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Video className="w-3 h-3 mr-1" />
+                    TikTok
+                  </Button>
                 </div>
-                
-                {/* Action Button */}
-                <Button
-                  variant="accent"
-                  size="sm"
-                  onClick={() => handleWhatsAppMessage(product)}
-                  disabled={product.isOutOfStock}
-                  className="w-full h-8 text-xs font-semibold"
-                >
-                  <MessageCircle className="w-3 h-3" />
-                  Buy on WhatsApp
-                </Button>
               </CardContent>
             </Card>
           ))}
@@ -417,9 +370,27 @@ const ProductCatalog = () => {
             <p className="text-muted-foreground">Try adjusting your search or filter criteria</p>
           </div>
         )}
+
+        {/* Add Product CTA */}
+        <Card className="border-dashed border-2">
+          <CardContent className="p-lg text-center space-y-md">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <Plus className="w-8 h-8 text-primary" />
+            </div>
+            <div className="space-y-sm">
+              <h3 className="text-lg font-semibold text-foreground">Add More Products</h3>
+              <p className="text-sm text-muted-foreground">
+                Post a TikTok video with <span className="font-bold text-primary">#TRACK</span> to automatically add new products
+              </p>
+            </div>
+            <Button variant="primary" size="lg">
+              Learn How to Add Products
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
 };
 
-export default ProductCatalog;
+export default SellerDashboard;

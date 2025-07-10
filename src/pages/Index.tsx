@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { SignupFlow } from '@/components/SignupFlow';
 import { FeatureCard } from '@/components/FeatureCard';

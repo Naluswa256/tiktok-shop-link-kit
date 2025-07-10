@@ -4,7 +4,9 @@ import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { SignupFlow } from '@/components/SignupFlow';
 import { FeatureCard } from '@/components/FeatureCard';
 import { ProductCatalogPreview } from '@/components/ProductCatalogPreview';
-import { ScrollText, MessageCircle, Eye, ArrowRight, Sparkles } from 'lucide-react';
+import { HowItWorks } from '@/components/HowItWorks';
+import { PhoneMockup } from '@/components/PhoneMockup';
+import { ScrollText, MessageCircle, Eye, ArrowRight, Sparkles, Play } from 'lucide-react';
 
 const Index = () => {
   const [showSignup, setShowSignup] = useState(false);
@@ -49,58 +51,77 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="relative z-10 text-center space-y-lg">
-          <div className="space-y-md">
-            <div className="flex items-center justify-center gap-2 text-accent font-semibold text-sm">
-              <Sparkles className="w-4 h-4" />
-              <span>New for Uganda</span>
-              <Sparkles className="w-4 h-4" />
-            </div>
-            
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-              Your TikTok → Your Shop<br />
-              <span className="text-primary">in One Link</span>
-            </h1>
-            
-            <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
-              Generate a shareable storefront link from your TikTok videos—no website or tech skills required.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-sm justify-center items-center">
-            <Button 
-              variant="primary" 
-              size="lg"
-              onClick={scrollToSignup}
-              className="group"
-            >
-              Create My Shop Link
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </Button>
-            
-            <Button variant="ghost" size="lg">
-              See Example
-            </Button>
-          </div>
-
-          {/* Trust Indicators */}
-          <div className="pt-lg">
-            <p className="text-xs text-muted-foreground mb-sm">Trusted by 500+ Ugandan sellers</p>
-            <div className="flex justify-center items-center gap-4 opacity-60">
-              <div className="flex -space-x-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div 
-                    key={i}
-                    className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-semibold"
-                  >
-                    {String.fromCharCode(65 + i)}
-                  </div>
-                ))}
+        <div className="relative z-10 grid lg:grid-cols-2 gap-xl items-center">
+          {/* Left Content */}
+          <div className="space-y-lg text-center lg:text-left">
+            <div className="space-y-md">
+              <div className="flex items-center justify-center lg:justify-start gap-2 text-accent font-semibold text-sm">
+                <Sparkles className="w-4 h-4" />
+                <span>New for Uganda</span>
+                <Sparkles className="w-4 h-4" />
               </div>
-              <span className="text-xs">+495 more</span>
+              
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+                Turn Your TikTok Videos<br />
+                <span className="text-primary">into a Shop Link</span>
+              </h1>
+              
+              <p className="text-base text-muted-foreground max-w-md mx-auto lg:mx-0 leading-relaxed">
+                <span className="font-semibold">Every product you post. Instantly shoppable.</span><br />
+                Sell what you post. Let buyers message you directly on WhatsApp.
+              </p>
+              
+              <p className="text-sm text-muted-foreground max-w-md mx-auto lg:mx-0">
+                No websites. No coding. Just post with <span className="font-semibold text-primary">#TRACK</span>.
+              </p>
             </div>
+
+            <div className="flex flex-col sm:flex-row gap-sm justify-center lg:justify-start items-center">
+              <Button 
+                variant="primary" 
+                size="lg"
+                onClick={scrollToSignup}
+                className="group"
+              >
+                Create My Shop Link
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+              
+              <Button variant="ghost" size="lg" className="gap-2">
+                <Play className="w-4 h-4" />
+                See Example
+              </Button>
+            </div>
+
+            {/* Trust Indicators */}
+            <div className="pt-lg">
+              <p className="text-xs text-muted-foreground mb-sm">Trusted by 500+ Ugandan sellers</p>
+              <div className="flex justify-center lg:justify-start items-center gap-4 opacity-60">
+                <div className="flex -space-x-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div 
+                      key={i}
+                      className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-semibold"
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-xs">+495 more</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Visual - Phone Mockup */}
+          <div className="flex justify-center lg:justify-end">
+            <PhoneMockup />
           </div>
         </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-xl bg-muted/30">
+        <HowItWorks />
       </section>
 
       {/* Feature Highlights */}

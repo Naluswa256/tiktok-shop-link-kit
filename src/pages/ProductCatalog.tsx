@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
-import { MessageCircle, Share2, Search, Eye, ExternalLink, ToggleLeft, ToggleRight, Filter, ChevronDown } from 'lucide-react';
+import { MessageCircle, Share2, Search, Eye, Video, ToggleLeft, ToggleRight, Filter, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -370,27 +370,31 @@ const ProductCatalog = () => {
                   </div>
                 )}
                 
-                {/* Action Buttons */}
-                <div className="flex gap-1 pt-1">
-                  <Button
-                    variant="accent"
-                    size="sm"
-                    onClick={() => handleWhatsAppMessage(product)}
-                    disabled={product.isOutOfStock}
-                    className="flex-1 h-8 text-xs font-semibold"
-                  >
-                    <MessageCircle className="w-3 h-3" />
-                    WhatsApp
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                {/* TikTok Link */}
+                <div className="bg-muted/50 rounded-md p-2 text-xs">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Video className="w-3 h-3" />
+                    <span className="font-medium">TikTok Video</span>
+                  </div>
+                  <button
                     onClick={() => window.open(product.tiktokUrl, '_blank')}
-                    className="px-2 h-8"
+                    className="text-primary hover:text-primary/80 font-medium text-left line-clamp-1"
                   >
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
+                    Watch the original video of this product
+                  </button>
                 </div>
+                
+                {/* Action Button */}
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => handleWhatsAppMessage(product)}
+                  disabled={product.isOutOfStock}
+                  className="w-full h-8 text-xs font-semibold"
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  Buy on WhatsApp
+                </Button>
               </CardContent>
             </Card>
           ))}

@@ -1,11 +1,11 @@
 
-# TikTok Commerce Design System
+# BuyLink UG Design System
 
-A mobile-first design system built for the TikTok Commerce Link Hub platform, optimized for Ugandan sellers.
+A mobile-first design system built for the BuyLink UG platform, optimized for Ugandan sellers.
 
 ## Overview
 
-This design system provides a comprehensive set of components, tokens, and patterns specifically designed for mobile-first e-commerce experiences. Built on top of shadcn/ui with custom theming for the TikTok Commerce brand.
+This design system provides a comprehensive set of components, tokens, and patterns specifically designed for mobile-first e-commerce experiences. Built on top of shadcn/ui with custom theming for the BuyLink UG brand.
 
 ## Design Principles
 
@@ -22,7 +22,7 @@ import { Button, ProductCard, Layout, Header } from "@/components/tiktok-commerc
 function App() {
   return (
     <Layout
-      header={<Header title="TikTok Commerce" />}
+      header={<Header title="BuyLink UG" />}
     >
       <ProductCard
         title="New Heels"
@@ -38,10 +38,10 @@ function App() {
 ## Components
 
 ### Button
-Mobile-optimized button with TikTok Commerce branding.
+Mobile-optimized button with BuyLink UG branding.
 
 **Variants:**
-- `primary` - Main call-to-action (red brand color)
+- `primary` - Main call-to-action (primary brand color)
 - `secondary` - Secondary actions (outlined)
 - `accent` - Highlighted actions (gold)
 - `success` - Positive feedback
@@ -115,7 +115,7 @@ const { spacing, typography, colors } = designTokens;
 ```
 
 ### Colors
-- **Primary**: `#E60023` (TikTok red)
+- **Primary**: `#E60023` (Brand red)
 - **Secondary**: `#000000` (Rich black)
 - **Accent**: `#FFD700` (Gold)
 - **Success**: `#28A745`

@@ -39,7 +39,7 @@ const Header = React.forwardRef<HTMLDivElement, HeaderProps>(
           {logo || (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-ds-sm flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">T</span>
+                <span className="text-primary-foreground font-bold text-sm">B</span>
               </div>
               {title && (
                 <span className="font-bold text-lg text-foreground">

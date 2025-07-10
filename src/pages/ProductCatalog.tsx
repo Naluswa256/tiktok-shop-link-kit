@@ -182,7 +182,7 @@ const ProductCatalog = () => {
               @{handle}'s Shop
             </h1>
             <p className="text-sm text-muted-foreground font-mono bg-muted/50 px-3 py-1 rounded-full inline-block">
-              tiktokshop.ug/shop/{handle}
+              buylink.ug/shop/{handle}
             </p>
           </div>
 

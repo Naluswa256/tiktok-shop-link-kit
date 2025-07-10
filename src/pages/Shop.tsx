@@ -49,7 +49,7 @@ const Shop = () => {
             @{shopHandle}'s Shop
           </h1>
           <p className="text-sm text-muted-foreground">
-            tiktokshop.ug/shop/{shopHandle}
+            buylink.ug/shop/{shopHandle}
           </p>
         </div>
 

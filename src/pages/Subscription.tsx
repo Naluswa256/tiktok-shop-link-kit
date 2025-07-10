@@ -95,7 +95,7 @@ const Subscription = () => {
                 
                 <div className="space-y-sm">
                   <h2 className="text-lg font-semibold text-success">
-                    Welcome to TikTok Commerce!
+                    Welcome to BuyLink UG!
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     Your subscription is active. Start posting TikTok videos with #TRACK to generate your first products.

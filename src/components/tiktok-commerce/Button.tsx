@@ -10,7 +10,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // TikTok Commerce specific variants
+        // BuyLink UG specific variants
         primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevation-sm active:shadow-none",
         secondary: "border border-secondary bg-background text-secondary hover:bg-secondary/5 shadow-elevation-sm",
         accent: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-elevation-sm font-semibold",

@@ -1,5 +1,5 @@
 
-// TikTok Commerce Design System Tokens
+// BuyLink UG Design System Tokens
 
 export const spacing = {
   xs: '0.25rem', // 4px

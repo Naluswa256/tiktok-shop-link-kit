@@ -50,7 +50,7 @@ export const SignupFlow = () => {
 
   const getShopUrl = () => {
     const handle = formData.tiktokHandle.replace('@', '');
-    return `tiktokshop.ug/shop/${handle}`;
+    return `buylink.ug/shop/${handle}`;
   };
 
   const handleCompleteSetup = () => {
@@ -171,7 +171,7 @@ export const SignupFlow = () => {
                 <div className="bg-muted/50 rounded-ds-md p-md space-y-sm">
                   <p className="text-sm font-medium">Your Shop Link:</p>
                   <div className="flex items-center gap-sm p-sm bg-background rounded-ds-sm border">
-                    <code className="text-sm text-primary flex-1">{getShopUrl()}</code>
+                    <code className="text-sm text-primary flex-1">buylink.ug/shop/{formData.tiktokHandle.replace('@', '')}</code>
                     <Button variant="ghost" size="sm" onClick={handleVisitLink}>
                       <ExternalLink className="w-4 h-4" />
                     </Button>

@@ -3,11 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* TikTok Commerce Design System Tokens */
+/* BuyLink UG Design System Tokens */
 
 @layer base {
   :root {
-    /* Brand Colors - TikTok Commerce Theme */
+    /* Brand Colors - BuyLink UG Theme */
     --primary: 0 84% 60%; /* #E60023 - High-energy red */
     --primary-foreground: 0 0% 100%;
     

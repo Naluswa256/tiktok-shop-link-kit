@@ -23,7 +23,7 @@ const Index = () => {
     <Layout
       header={
         <Header 
-          title="TikTok Commerce" 
+          title="BuyLink UG" 
           actions={
             <Button variant="ghost" size="sm">
               Sign In
@@ -80,7 +80,7 @@ const Index = () => {
               onClick={scrollToSignup}
               className="group"
             >
-              Create My Shop Link
+              Get My Shop Link
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Button>
             

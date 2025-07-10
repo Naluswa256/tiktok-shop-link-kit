@@ -1,10 +1,13 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
-import { MessageCircle, Share2, TrendingUp, Video } from 'lucide-react';
+import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const Shop = () => {
+  const navigate = useNavigate();
+  
   // This would typically come from URL params or props
   const shopHandle = 'nalu-fashion';
   const hasProducts = false; // Simulate no products yet
@@ -17,6 +20,15 @@ const Shop = () => {
           actions={
             <div className="flex items-center gap-sm">
               <PageViewCounter count={0} />
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/login')}
+                className="gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </Button>
               <Button variant="ghost" size="sm">
                 <Share2 className="w-4 h-4" />
               </Button>

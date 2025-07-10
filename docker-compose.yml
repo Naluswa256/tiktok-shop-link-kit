@@ -1,0 +1,238 @@
+version: '3.8'
+
+services:
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3001/api/v1
+      - VITE_PRODUCT_API_URL=http://localhost:3002/api/v1
+    depends_on:
+      - ingestion-api
+      - product-service
+    networks:
+      - tiktok-network
+
+  # Ingestion API (NestJS)
+  ingestion-api:
+    build:
+      context: ./apps/ingestion-api
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/ingestion-api:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+      - DYNAMODB_VIDEOS_TABLE=tiktok-videos-dev
+      - DYNAMODB_JOBS_TABLE=tiktok-processing-jobs-dev
+      - SNS_ENDPOINT=http://localstack:4566
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:tiktok-processing-dev
+      - SQS_ENDPOINT=http://localstack:4566
+      - SQS_CAPTION_ANALYSIS_QUEUE=http://localstack:4566/000000000000/tiktok-caption-analysis-dev
+      - SQS_THUMBNAIL_GENERATION_QUEUE=http://localstack:4566/000000000000/tiktok-thumbnail-generation-dev
+      - SQS_AUTO_TAGGING_QUEUE=http://localstack:4566/000000000000/tiktok-auto-tagging-dev
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - localstack
+      - redis
+    networks:
+      - tiktok-network
+
+  # Product Service (NestJS)
+  product-service:
+    build:
+      context: ./apps/product-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./apps/product-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+      - DYNAMODB_PRODUCTS_TABLE=tiktok-products-dev
+      - S3_ENDPOINT=http://localstack:4566
+      - S3_BUCKET=tiktok-commerce-assets-dev
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - localstack
+      - redis
+    networks:
+      - tiktok-network
+
+  # WhatsApp Service (NestJS)
+  whatsapp-service:
+    build:
+      context: ./apps/whatsapp-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./apps/whatsapp-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - WHATSAPP_API_URL=https://graph.facebook.com/v18.0
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+      - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
+    networks:
+      - tiktok-network
+
+  # LocalStack (AWS services emulation)
+  localstack:
+    image: localstack/localstack:3.0
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,dynamodb,sns,sqs,lambda
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - "./localstack-init:/etc/localstack/init/ready.d"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "localstack-data:/tmp/localstack"
+    networks:
+      - tiktok-network
+
+  # Redis (Caching)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - tiktok-network
+
+  # DynamoDB Admin (Web UI for DynamoDB)
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    ports:
+      - "8001:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://localstack:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - localstack
+    networks:
+      - tiktok-network
+
+  # Redis Commander (Web UI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8002:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - tiktok-network
+
+  # AI Workers (Python Lambda functions for local testing)
+  caption-parser:
+    build:
+      context: ./apps/ai-workers/caption-parser
+      dockerfile: Dockerfile.dev
+    environment:
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:tiktok-processing-dev
+      - SNS_ENDPOINT=http://localstack:4566
+      - S3_BUCKET=tiktok-commerce-assets-dev
+      - S3_ENDPOINT=http://localstack:4566
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - localstack
+    networks:
+      - tiktok-network
+
+  thumbnail-generator:
+    build:
+      context: ./apps/ai-workers/thumbnail-generator
+      dockerfile: Dockerfile.dev
+    environment:
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:tiktok-processing-dev
+      - SNS_ENDPOINT=http://localstack:4566
+      - S3_BUCKET=tiktok-commerce-thumbnails-dev
+      - S3_ENDPOINT=http://localstack:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - localstack
+    networks:
+      - tiktok-network
+
+  auto-tagger:
+    build:
+      context: ./apps/ai-workers/auto-tagger
+      dockerfile: Dockerfile.dev
+    environment:
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:tiktok-processing-dev
+      - SNS_ENDPOINT=http://localstack:4566
+      - TAGS_TABLE=tiktok-tags-dev
+      - TRENDS_TABLE=tiktok-trends-dev
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - localstack
+    networks:
+      - tiktok-network
+
+  # Nginx (Reverse proxy for local development)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - ingestion-api
+      - product-service
+      - whatsapp-service
+    networks:
+      - tiktok-network
+
+volumes:
+  localstack-data:
+  redis-data:
+
+networks:
+  tiktok-network:
+    driver: bridge

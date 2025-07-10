@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
@@ -70,7 +69,6 @@ const Login = () => {
       header={
         <Header 
           title="Seller Login"
-          showBack
         />
       }
     >

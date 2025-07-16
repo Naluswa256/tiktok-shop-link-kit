@@ -87,6 +87,61 @@ output "sqs_auto_tagging_queue_arn" {
   value       = module.sqs_auto_tagging.queue_arn
 }
 
+# New Video Posted SNS Topic Outputs
+output "sns_new_video_posted_topic_arn" {
+  description = "ARN of the new video posted SNS topic"
+  value       = module.sns_new_video_posted.topic_arn
+}
+
+output "sns_new_video_posted_topic_name" {
+  description = "Name of the new video posted SNS topic"
+  value       = module.sns_new_video_posted.topic_name
+}
+
+# Shops DynamoDB Table Outputs
+output "dynamodb_shops_table_name" {
+  description = "Name of the DynamoDB shops table"
+  value       = module.dynamodb_shops.table_name
+}
+
+output "dynamodb_shops_table_arn" {
+  description = "ARN of the DynamoDB shops table"
+  value       = module.dynamodb_shops.table_arn
+}
+
+# Analytics DynamoDB Table Outputs
+output "dynamodb_analytics_table_name" {
+  description = "Name of the DynamoDB analytics table"
+  value       = module.dynamodb_analytics.table_name
+}
+
+output "dynamodb_analytics_table_arn" {
+  description = "ARN of the DynamoDB analytics table"
+  value       = module.dynamodb_analytics.table_arn
+}
+
+# Ingestion State DynamoDB Table Outputs
+output "dynamodb_ingestion_state_table_name" {
+  description = "Name of the DynamoDB ingestion state table"
+  value       = module.dynamodb_ingestion_state.table_name
+}
+
+output "dynamodb_ingestion_state_table_arn" {
+  description = "ARN of the DynamoDB ingestion state table"
+  value       = module.dynamodb_ingestion_state.table_arn
+}
+
+# Scheduled Ingestion Lambda Outputs
+output "scheduled_ingestion_lambda_function_name" {
+  description = "Name of the scheduled ingestion Lambda function"
+  value       = aws_lambda_function.scheduled_ingestion.function_name
+}
+
+output "scheduled_ingestion_lambda_arn" {
+  description = "ARN of the scheduled ingestion Lambda function"
+  value       = aws_lambda_function.scheduled_ingestion.arn
+}
+
 # Lambda Outputs
 output "lambda_caption_parser_function_name" {
   description = "Name of the caption parser Lambda function"
@@ -219,6 +274,9 @@ output "environment_variables" {
     DYNAMODB_VIDEOS_TABLE   = module.dynamodb_videos.table_name
     DYNAMODB_PRODUCTS_TABLE = module.dynamodb_products.table_name
     DYNAMODB_JOBS_TABLE     = module.dynamodb_jobs.table_name
+    DYNAMODB_SHOPS_TABLE    = module.dynamodb_shops.table_name
+    DYNAMODB_ANALYTICS_TABLE = module.dynamodb_analytics.table_name
+    DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_ingestion_state.table_name
     
     # Storage
     S3_ASSETS_BUCKET     = module.s3_assets.bucket_name
@@ -226,6 +284,7 @@ output "environment_variables" {
     
     # Messaging
     SNS_PROCESSING_TOPIC_ARN           = module.sns_processing.topic_arn
+    SNS_NEW_VIDEO_POSTED_TOPIC_ARN     = module.sns_new_video_posted.topic_arn
     SQS_CAPTION_ANALYSIS_QUEUE_URL     = module.sqs_caption_analysis.queue_url
     SQS_THUMBNAIL_GENERATION_QUEUE_URL = module.sqs_thumbnail_generation.queue_url
     SQS_AUTO_TAGGING_QUEUE_URL         = module.sqs_auto_tagging.queue_url

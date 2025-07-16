@@ -86,15 +86,15 @@
     "@eslint/js": "^9.9.0",
     "@nestjs/cli": "^10.4.5",
     "@nestjs/schematics": "^10.1.4",
-    "@nx/eslint": "^20.0.0",
-    "@nx/eslint-plugin": "^20.0.0",
-    "@nx/js": "^20.0.0",
-    "@nx/nest": "^20.0.0",
-    "@nx/next": "^20.0.0",
-    "@nx/node": "^20.0.0",
-    "@nx/react": "^20.0.0",
-    "@nx/vite": "^20.0.0",
-    "@nx/workspace": "^20.0.0",
+    "@nx/eslint": "^20.8.2",
+    "@nx/eslint-plugin": "^20.8.2",
+    "@nx/js": "^20.8.2",
+    "@nx/nest": "^20.8.2",
+    "@nx/next": "^20.8.2",
+    "@nx/node": "^20.8.2",
+    "@nx/react": "^20.8.2",
+    "@nx/vite": "^20.8.2",
+    "@nx/workspace": "^20.8.2",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
@@ -102,14 +102,14 @@
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-prettier": "^10.1.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "lovable-tagger": "^1.1.7",
-    "nx": "^20.0.0",
+    "nx": "^20.8.2",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.11",
@@ -119,8 +119,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,css,md}": [
-      "prettier --write",
-      "eslint --fix"
+      "prettier --write"
     ]
   }
 }

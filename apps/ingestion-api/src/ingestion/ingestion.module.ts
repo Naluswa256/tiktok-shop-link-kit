@@ -1,10 +1,26 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { IngestionController } from './ingestion.controller';
-import { IngestionService } from './ingestion.service';
+import { IngestionService as ScheduledIngestionService } from './services/ingestion.service';
+import { ApifyService } from './services/apify.service';
+import { MonitoringService } from './services/monitoring.service';
 
 @Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+  ],
   controllers: [IngestionController],
-  providers: [IngestionService],
-  exports: [IngestionService],
+  providers: [
+    ScheduledIngestionService,
+    ApifyService,
+    MonitoringService,
+  ],
+  exports: [
+    ScheduledIngestionService,
+    ApifyService,
+    MonitoringService,
+  ],
 })
 export class IngestionModule {}

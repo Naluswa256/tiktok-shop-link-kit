@@ -1,13 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Health check endpoint' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service is healthy',
     schema: {
       type: 'object',
@@ -29,6 +31,7 @@ export class HealthController {
   }
 
   @Get('ready')
+  @Public()
   @ApiOperation({ summary: 'Readiness check endpoint' })
   @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
   ready() {

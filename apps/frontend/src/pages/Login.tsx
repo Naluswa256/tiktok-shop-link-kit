@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,15 +8,28 @@ import { Label } from '@/components/ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Phone, MessageSquare, ArrowRight, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getUserFriendlyErrorMessage } from '@/lib/api';
 
 const Login = () => {
   const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState<string>('/dashboard');
+
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { signin, verifySignin } = useAuth();
+
+  // Check for redirect parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const redirect = urlParams.get('redirect');
+    if (redirect) {
+      setRedirectPath(decodeURIComponent(redirect));
+    }
+  }, [location.search]);
 
   const handleSendOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
@@ -29,17 +42,33 @@ const Login = () => {
     }
 
     setIsLoading(true);
-    
-    // Simulate API call to send OTP
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsLoading(false);
-    setStep('otp');
-    
-    toast({
-      title: "OTP Sent!",
-      description: `Verification code sent to ${phoneNumber}`,
-    });
+
+    try {
+      // Format phone number to E.164 format
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+256${phoneNumber}`;
+
+      const response = await signin(formattedPhone);
+
+      if (response.success) {
+        setStep('otp');
+        toast({
+          title: "OTP Sent!",
+          description: response.data.codeDelivery?.destination
+            ? `Verification code sent to ${response.data.codeDelivery.destination}`
+            : `Verification code sent to your phone`,
+        });
+      }
+    } catch (error) {
+      const errorMessage = getUserFriendlyErrorMessage(error, 'signin');
+
+      toast({
+        title: "Sign In Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleVerifyOTP = async () => {
@@ -53,27 +82,40 @@ const Login = () => {
     }
 
     setIsLoading(true);
-    
-    // Simulate API call to verify OTP
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock user data - in real app this would come from API
-    const userData = {
-      id: '1',
-      phoneNumber: `+256${phoneNumber}`,
-      tiktokHandle: '@nalu-fashion',
-      shopHandle: 'nalu-fashion'
-    };
-    
-    login(userData);
-    
-    setIsLoading(false);
-    setStep('success');
-    
-    // Redirect to seller dashboard after success message
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 2000);
+
+    try {
+      // Format phone number to E.164 format
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+256${phoneNumber}`;
+
+      const response = await verifySignin(formattedPhone, otp);
+
+      if (response.success && response.data) {
+        setStep('success');
+
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully signed in.",
+        });
+
+        // Redirect to appropriate page after success message
+        setTimeout(() => {
+          navigate(redirectPath);
+        }, 2000);
+      }
+    } catch (error) {
+      const errorMessage = getUserFriendlyErrorMessage(error, 'verify');
+
+      toast({
+        title: "Verification Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+
+      // Clear OTP on error
+      setOtp('');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

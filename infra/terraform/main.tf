@@ -114,13 +114,18 @@ module "dynamodb_videos" {
 
 module "dynamodb_products" {
   source = "./modules/dynamodb"
-  
+
   table_name = "${local.name_prefix}-products"
-  hash_key   = "id"
-  
+  hash_key   = "seller_handle"
+  range_key  = "video_id"
+
   attributes = [
     {
-      name = "id"
+      name = "seller_handle"
+      type = "S"
+    },
+    {
+      name = "video_id"
       type = "S"
     },
     {
@@ -128,20 +133,30 @@ module "dynamodb_products" {
       type = "S"
     },
     {
-      name = "createdAt"
+      name = "created_at"
+      type = "S"
+    },
+    {
+      name = "status"
       type = "S"
     }
   ]
-  
+
   global_secondary_indexes = [
     {
       name     = "CategoryIndex"
       hash_key = "category"
-      range_key = "createdAt"
+      range_key = "created_at"
+      projection_type = "ALL"
+    },
+    {
+      name     = "StatusIndex"
+      hash_key = "status"
+      range_key = "created_at"
       projection_type = "ALL"
     }
   ]
-  
+
   tags = local.common_tags
 }
 
@@ -188,12 +203,144 @@ module "dynamodb_jobs" {
   tags = local.common_tags
 }
 
+module "dynamodb_shops" {
+  source = "./modules/dynamodb"
+
+  table_name = "${local.name_prefix}-shops"
+  hash_key   = "handle"
+
+  attributes = [
+    {
+      name = "handle"
+      type = "S"
+    },
+    {
+      name = "phone"
+      type = "S"
+    },
+    {
+      name = "created_at"
+      type = "S"
+    },
+    {
+      name = "subscription_status"
+      type = "S"
+    }
+  ]
+
+  global_secondary_indexes = [
+    {
+      name     = "PhoneIndex"
+      hash_key = "phone"
+      range_key = "created_at"
+      projection_type = "ALL"
+    },
+    {
+      name     = "SubscriptionIndex"
+      hash_key = "subscription_status"
+      range_key = "created_at"
+      projection_type = "ALL"
+    }
+  ]
+
+  tags = local.common_tags
+}
+
+module "dynamodb_analytics" {
+  source = "./modules/dynamodb"
+
+  table_name = "${local.name_prefix}-analytics"
+  hash_key   = "shop_handle"
+  range_key  = "timestamp"
+
+  attributes = [
+    {
+      name = "shop_handle"
+      type = "S"
+    },
+    {
+      name = "timestamp"
+      type = "S"
+    },
+    {
+      name = "event_type"
+      type = "S"
+    },
+    {
+      name = "date"
+      type = "S"
+    }
+  ]
+
+  global_secondary_indexes = [
+    {
+      name     = "EventTypeIndex"
+      hash_key = "event_type"
+      range_key = "timestamp"
+      projection_type = "ALL"
+    },
+    {
+      name     = "DateIndex"
+      hash_key = "date"
+      range_key = "timestamp"
+      projection_type = "ALL"
+    }
+  ]
+
+  tags = local.common_tags
+}
+
+module "dynamodb_ingestion_state" {
+  source = "./modules/dynamodb"
+
+  table_name = "${local.name_prefix}-ingestion-state"
+  hash_key   = "handle"
+
+  attributes = [
+    {
+      name = "handle"
+      type = "S"
+    },
+    {
+      name = "last_run"
+      type = "S"
+    },
+    {
+      name = "status"
+      type = "S"
+    }
+  ]
+
+  global_secondary_indexes = [
+    {
+      name     = "StatusIndex"
+      hash_key = "status"
+      range_key = "last_run"
+      projection_type = "ALL"
+    }
+  ]
+
+  tags = local.common_tags
+}
+
 # SNS Topics
 module "sns_processing" {
   source = "./modules/sns_topic"
-  
+
   topic_name = "${local.name_prefix}-processing"
-  
+
+  tags = local.common_tags
+}
+
+module "sns_new_video_posted" {
+  source = "./modules/sns_topic"
+
+  topic_name = "${local.name_prefix}-new-video-posted"
+
+  # Create CloudWatch alarms for monitoring
+  create_alarms = var.enable_detailed_monitoring
+  error_threshold = 1
+
   tags = local.common_tags
 }
 
@@ -240,27 +387,329 @@ module "sqs_auto_tagging" {
   tags = local.common_tags
 }
 
+# SNS to SQS Subscriptions for fan-out from new-video-posted topic
+resource "aws_sns_topic_subscription" "caption_analysis" {
+  topic_arn = module.sns_new_video_posted.topic_arn
+  protocol  = "sqs"
+  endpoint  = module.sqs_caption_analysis.queue_arn
+}
+
+resource "aws_sns_topic_subscription" "thumbnail_generation" {
+  topic_arn = module.sns_new_video_posted.topic_arn
+  protocol  = "sqs"
+  endpoint  = module.sqs_thumbnail_generation.queue_arn
+}
+
+resource "aws_sns_topic_subscription" "auto_tagging" {
+  topic_arn = module.sns_new_video_posted.topic_arn
+  protocol  = "sqs"
+  endpoint  = module.sqs_auto_tagging.queue_arn
+}
+
+# SQS Queue Policies to allow SNS to send messages
+resource "aws_sqs_queue_policy" "caption_analysis_policy" {
+  queue_url = module.sqs_caption_analysis.queue_url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "sns.amazonaws.com"
+        }
+        Action   = "sqs:SendMessage"
+        Resource = module.sqs_caption_analysis.queue_arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = module.sns_new_video_posted.topic_arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_sqs_queue_policy" "thumbnail_generation_policy" {
+  queue_url = module.sqs_thumbnail_generation.queue_url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "sns.amazonaws.com"
+        }
+        Action   = "sqs:SendMessage"
+        Resource = module.sqs_thumbnail_generation.queue_arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = module.sns_new_video_posted.topic_arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_sqs_queue_policy" "auto_tagging_policy" {
+  queue_url = module.sqs_auto_tagging.queue_url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "sns.amazonaws.com"
+        }
+        Action   = "sqs:SendMessage"
+        Resource = module.sqs_auto_tagging.queue_arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = module.sns_new_video_posted.topic_arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Scheduled Ingestion Lambda
+resource "aws_lambda_function" "scheduled_ingestion" {
+  filename         = "scheduled-ingestion.zip"
+  function_name    = "${local.name_prefix}-scheduled-ingestion"
+  role            = aws_iam_role.scheduled_ingestion_lambda_role.arn
+  handler         = "scheduled-ingestion.handler"
+  runtime         = "nodejs18.x"
+  timeout         = 900  # 15 minutes
+  memory_size     = 512
+
+  environment {
+    variables = {
+      NODE_ENV                        = var.environment
+      AWS_REGION                      = var.aws_region
+      DYNAMODB_SHOPS_TABLE           = module.dynamodb_shops.table_name
+      DYNAMODB_PRODUCTS_TABLE        = module.dynamodb_products.table_name
+      DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_ingestion_state.table_name
+      SNS_NEW_VIDEO_POSTED_TOPIC_ARN = module.sns_new_video_posted.topic_arn
+      APIFY_TOKEN                    = var.apify_token
+      APIFY_ACTOR_ID                 = var.apify_actor_id
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# IAM Role for Scheduled Ingestion Lambda
+resource "aws_iam_role" "scheduled_ingestion_lambda_role" {
+  name = "${local.name_prefix}-scheduled-ingestion-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+# IAM Policy for Scheduled Ingestion Lambda
+resource "aws_iam_role_policy" "scheduled_ingestion_lambda_policy" {
+  name = "${local.name_prefix}-scheduled-ingestion-lambda-policy"
+  role = aws_iam_role.scheduled_ingestion_lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          module.dynamodb_shops.table_arn,
+          module.dynamodb_products.table_arn,
+          module.dynamodb_ingestion_state.table_arn,
+          "${module.dynamodb_shops.table_arn}/index/*",
+          "${module.dynamodb_products.table_arn}/index/*",
+          "${module.dynamodb_ingestion_state.table_arn}/index/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = module.sns_new_video_posted.topic_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# EventBridge Rules for Scheduled Ingestion
+resource "aws_cloudwatch_event_rule" "scheduled_ingestion_morning" {
+  name                = "${local.name_prefix}-scheduled-ingestion-morning"
+  description         = "Trigger ingestion job at 06:00 UTC daily"
+  schedule_expression = "cron(0 6 * * ? *)"  # 06:00 UTC daily
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_rule" "scheduled_ingestion_evening" {
+  name                = "${local.name_prefix}-scheduled-ingestion-evening"
+  description         = "Trigger ingestion job at 18:00 UTC daily"
+  schedule_expression = "cron(0 18 * * ? *)"  # 18:00 UTC daily
+
+  tags = local.common_tags
+}
+
+# EventBridge Targets
+resource "aws_cloudwatch_event_target" "scheduled_ingestion_morning_target" {
+  rule      = aws_cloudwatch_event_rule.scheduled_ingestion_morning.name
+  target_id = "ScheduledIngestionMorningTarget"
+  arn       = aws_lambda_function.scheduled_ingestion.arn
+
+  input = jsonencode({
+    source      = "aws.events"
+    detail-type = "Scheduled Event"
+    detail = {
+      schedule = "morning"
+      time     = "06:00"
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "scheduled_ingestion_evening_target" {
+  rule      = aws_cloudwatch_event_rule.scheduled_ingestion_evening.name
+  target_id = "ScheduledIngestionEveningTarget"
+  arn       = aws_lambda_function.scheduled_ingestion.arn
+
+  input = jsonencode({
+    source      = "aws.events"
+    detail-type = "Scheduled Event"
+    detail = {
+      schedule = "evening"
+      time     = "18:00"
+    }
+  })
+}
+
+# Lambda Permissions for EventBridge
+resource "aws_lambda_permission" "allow_eventbridge_morning" {
+  statement_id  = "AllowExecutionFromEventBridgeMorning"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.scheduled_ingestion.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_ingestion_morning.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_evening" {
+  statement_id  = "AllowExecutionFromEventBridgeEvening"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.scheduled_ingestion.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_ingestion_evening.arn
+}
+
+# S3 Bucket for Thumbnails
+resource "aws_s3_bucket" "product_thumbnails" {
+  bucket = "${local.name_prefix}-product-thumbnails"
+  tags   = local.common_tags
+}
+
+resource "aws_s3_bucket_versioning" "product_thumbnails_versioning" {
+  bucket = aws_s3_bucket.product_thumbnails.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "product_thumbnails_encryption" {
+  bucket = aws_s3_bucket.product_thumbnails.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "product_thumbnails_lifecycle" {
+  bucket = aws_s3_bucket.product_thumbnails.id
+
+  rule {
+    id     = "cleanup_old_thumbnails"
+    status = "Enabled"
+
+    expiration {
+      days = 365 # Keep thumbnails for 1 year
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+}
+
 # AI Workers (Lambda Functions)
 module "lambda_caption_parser" {
   source = "./modules/ai_worker"
-  
+
   function_name = "${local.name_prefix}-caption-parser"
-  description   = "AI worker for parsing TikTok video captions"
-  
+  description   = "AI worker for parsing TikTok video captions using LLM"
+
   source_dir = "../../apps/ai-workers/caption-parser"
-  handler    = "main.lambda_handler"
-  runtime    = "python3.11"
+  handler    = "index.lambdaHandler"
+  runtime    = "nodejs18.x"
   timeout    = 300
-  memory_size = 1024
-  
+  memory_size = 512
+
   environment_variables = {
-    SNS_TOPIC_ARN = module.sns_processing.topic_arn
-    S3_BUCKET     = module.s3_assets.bucket_name
-    OPENAI_API_KEY = var.openai_api_key
+    NODE_ENV                = var.environment
+    AWS_REGION              = var.aws_region
+    SQS_QUEUE_URL          = module.sqs_caption_parser.queue_url
+    SNS_TOPIC_ARN          = module.sns_caption_parsed.topic_arn
+    LLM_PROVIDER           = var.llm_provider
+    LLM_MODEL              = var.llm_model
+    OPENROUTER_API_KEY     = var.openrouter_api_key
+    OLLAMA_BASE_URL        = var.ollama_base_url
+    BATCH_SIZE             = "5"
+    MAX_RETRIES            = "3"
+    VISIBILITY_TIMEOUT     = "300"
+    WAIT_TIME_SECONDS      = "20"
   }
-  
-  event_source_arn = module.sqs_caption_analysis.queue_arn
-  
+
+  event_source_arn = module.sqs_caption_parser.queue_arn
+
   tags = local.common_tags
 }
 
@@ -271,14 +720,35 @@ module "lambda_thumbnail_generator" {
   description   = "AI worker for generating product thumbnails"
   
   source_dir = "../../apps/ai-workers/thumbnail-generator"
-  handler    = "main.lambda_handler"
-  runtime    = "python3.11"
-  timeout    = 600
-  memory_size = 2048
-  
+  handler    = "index.lambdaHandler"
+  runtime    = "nodejs18.x"
+  timeout    = 900  # 15 minutes for video processing
+  memory_size = 1024
+
   environment_variables = {
-    SNS_TOPIC_ARN = module.sns_processing.topic_arn
-    S3_BUCKET     = module.s3_thumbnails.bucket_name
+    NODE_ENV                        = var.environment
+    AWS_REGION                      = var.aws_region
+    SQS_QUEUE_URL                  = module.sqs_thumbnail_generator.queue_url
+    SNS_TOPIC_ARN                  = module.sns_thumbnail_generated.topic_arn
+    S3_BUCKET_NAME                 = aws_s3_bucket.product_thumbnails.bucket
+    MAX_VIDEO_SIZE_MB              = "50"
+    MAX_VIDEO_DURATION_SECONDS     = "60"
+    FRAME_EXTRACTION_INTERVAL      = "2"
+    MAX_FRAMES_TO_ANALYZE          = "15"
+    THUMBNAILS_TO_GENERATE         = "5"
+    YOLO_MODEL_PATH                = "yolov8n.pt"
+    YOLO_CONFIDENCE_THRESHOLD      = "0.5"
+    YOLO_IOU_THRESHOLD             = "0.5"
+    MIN_QUALITY_SCORE              = "0.4"
+    MIN_BRIGHTNESS_SCORE           = "0.3"
+    MAX_BLUR_SCORE                 = "0.7"
+    THUMBNAIL_WIDTH                = "400"
+    THUMBNAIL_HEIGHT               = "400"
+    THUMBNAIL_QUALITY              = "85"
+    BATCH_SIZE                     = "1"
+    MAX_RETRIES                    = "3"
+    VISIBILITY_TIMEOUT             = "900"
+    WAIT_TIME_SECONDS              = "20"
   }
   
   event_source_arn = module.sqs_thumbnail_generation.queue_arn
@@ -293,15 +763,24 @@ module "lambda_auto_tagger" {
   description   = "AI worker for auto-tagging content"
   
   source_dir = "../../apps/ai-workers/auto-tagger"
-  handler    = "main.lambda_handler"
-  runtime    = "python3.11"
-  timeout    = 180
+  handler    = "index.lambdaHandler"
+  runtime    = "nodejs18.x"
+  timeout    = 300
   memory_size = 512
-  
+
   environment_variables = {
-    SNS_TOPIC_ARN = module.sns_processing.topic_arn
-    TAGS_TABLE    = module.dynamodb_videos.table_name
-    OPENAI_API_KEY = var.openai_api_key
+    NODE_ENV                = var.environment
+    AWS_REGION              = var.aws_region
+    SQS_QUEUE_URL          = module.sqs_auto_tagger.queue_url
+    SNS_TOPIC_ARN          = module.sns_tags_generated.topic_arn
+    LLM_PROVIDER           = var.llm_provider
+    LLM_MODEL              = var.llm_model
+    OPENROUTER_API_KEY     = var.openrouter_api_key
+    OLLAMA_BASE_URL        = var.ollama_base_url
+    BATCH_SIZE             = "10"
+    MAX_RETRIES            = "3"
+    VISIBILITY_TIMEOUT     = "300"
+    WAIT_TIME_SECONDS      = "20"
   }
   
   event_source_arn = module.sqs_auto_tagging.queue_arn

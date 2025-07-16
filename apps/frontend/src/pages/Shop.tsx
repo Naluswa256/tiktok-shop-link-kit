@@ -1,56 +1,323 @@
 
-import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
 import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { SubscriptionPrompt } from '@/components/SubscriptionPrompt';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { shopApi, ShopData, handleApiError } from '@/lib/api';
 
 const Shop = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { handle } = useParams<{ handle: string }>();
-  
+  const { user, isAuthenticated, token } = useAuth();
+
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [shopData, setShopData] = useState<ShopData | null>(null);
+  const [ownerData, setOwnerData] = useState<ShopData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [viewCount, setViewCount] = useState<number>(0);
+  const [productCount, setProductCount] = useState<number>(0);
+  const [isFirstTimeSignup, setIsFirstTimeSignup] = useState(false);
+
   const shopHandle = handle || 'unknown';
-  const hasProducts = false; // Simulate no products yet
+  const hasProducts = productCount > 0; // Will be updated from API
+  const isOwner = isAuthenticated && (user?.tiktokHandle === shopHandle || user?.shopHandle === shopHandle);
+
+  // Check if this is a first-time signup flow (coming from subscription selection)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const fromSubscription = urlParams.get('from') === 'subscription';
+    const isNewUser = urlParams.get('new') === 'true';
+    setIsFirstTimeSignup(fromSubscription && isNewUser);
+  }, [location.search]);
+
+  // Increment view count (would be connected to backend in production)
+  useEffect(() => {
+    // Simulate view count increment
+    const randomViews = Math.floor(Math.random() * 100) + 10;
+    setViewCount(randomViews);
+
+    // This would be an API call in production:
+    // shopApi.incrementShopViews(shopHandle);
+  }, [shopHandle]);
+
+  // Fetch shop data based on user status and scenario
+  const fetchShopData = async () => {
+    if (!handle) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Scenario 1: First-time signup (from subscription page) - get owner data immediately
+      if (isFirstTimeSignup && isAuthenticated && isOwner && token) {
+        const ownerResponse = await shopApi.getShopByHandleOwner(handle, token);
+        setOwnerData(ownerResponse.data);
+        setShopData(ownerResponse.data); // Use owner data as main data
+
+        if (ownerResponse.data.analytics) {
+          setViewCount(ownerResponse.data.analytics.total_views || 0);
+        }
+        if (ownerResponse.data.productCount !== undefined) {
+          setProductCount(ownerResponse.data.productCount);
+        }
+        setHasActiveSubscription(true);
+
+        toast.success('Welcome to your shop! You now have access to detailed analytics.');
+      }
+      // Scenario 2: Authenticated owner (returning user) - get owner data
+      else if (isAuthenticated && isOwner && token) {
+        // Get both public and owner data
+        const [publicResponse, ownerResponse] = await Promise.all([
+          shopApi.getShopByHandle(handle),
+          shopApi.getShopByHandleOwner(handle, token)
+        ]);
+
+        setShopData(publicResponse.data);
+        setOwnerData(ownerResponse.data);
+
+        // Use owner analytics if available
+        if (ownerResponse.data.analytics) {
+          setViewCount(ownerResponse.data.analytics.total_views || 0);
+        } else if (publicResponse.data.viewCount) {
+          setViewCount(publicResponse.data.viewCount);
+        }
+
+        if (ownerResponse.data.productCount !== undefined) {
+          setProductCount(ownerResponse.data.productCount);
+        } else if (publicResponse.data.productCount !== undefined) {
+          setProductCount(publicResponse.data.productCount);
+        }
+
+        setHasActiveSubscription(true);
+      }
+      // Scenario 3: Public access (buyers or unauthenticated users)
+      else {
+        const response = await shopApi.getShopByHandle(handle);
+        setShopData(response.data);
+
+        // Update view count and product count from API response
+        if (response.data.viewCount) {
+          setViewCount(response.data.viewCount);
+        }
+        if (response.data.productCount !== undefined) {
+          setProductCount(response.data.productCount);
+        }
+
+        // Update subscription status based on shop data
+        if (response.data.subscriptionStatus === 'trial' || response.data.subscriptionStatus === 'active') {
+          setHasActiveSubscription(true);
+        }
+      }
+
+      // Track the view (for all scenarios)
+      await shopApi.trackShopView(handle, {
+        referrer: document.referrer,
+        userAgent: navigator.userAgent,
+      });
+
+    } catch (error) {
+      // If shop not found, show basic shop info
+      console.log('Shop data not available:', error);
+      setShopData({
+        shopId: '',
+        handle: handle,
+        shopLink: `/shop/${handle}`,
+        displayName: `@${handle}`,
+        profilePhotoUrl: '',
+        followerCount: 0,
+        isVerified: false,
+        subscriptionStatus: 'unknown',
+        createdAt: new Date().toISOString(),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check subscription status on component mount
+  useEffect(() => {
+    const checkSubscriptionStatus = () => {
+      // Check if user has active trial or subscription
+      const trialStarted = localStorage.getItem('buylink_trial_started');
+      const trialStartDate = localStorage.getItem('buylink_trial_start_date');
+
+      if (trialStarted && trialStartDate) {
+        const startDate = new Date(trialStartDate);
+        const now = new Date();
+        const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Trial is active for 7 days
+        if (daysSinceStart < 7) {
+          setHasActiveSubscription(true);
+          return;
+        }
+      }
+
+      // Check if this is a new user coming from signup
+      const fromSignup = location.state?.fromSignup;
+      const isFirstVisit = !localStorage.getItem('buylink_shop_visited_' + shopHandle);
+
+      if (isOwner && (fromSignup || isFirstVisit) && !hasActiveSubscription) {
+        setShowSubscriptionPrompt(true);
+        localStorage.setItem('buylink_shop_visited_' + shopHandle, 'true');
+      }
+    };
+
+    if (handle) {
+      checkSubscriptionStatus();
+      fetchShopData();
+    }
+  }, [handle, isOwner, hasActiveSubscription, location.state, token, isAuthenticated, isFirstTimeSignup]);
+
+  const handleSubscriptionComplete = () => {
+    setHasActiveSubscription(true);
+    setShowSubscriptionPrompt(false);
+    toast.success('Welcome to your shop! Start posting with #TRACK to add products.');
+  };
 
   return (
-    <Layout
-      header={
-        <Header 
-          title={`@${shopHandle}`}
-          actions={
-            <div className="flex items-center gap-sm">
-              <PageViewCounter count={0} />
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate('/login')}
-                className="gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                Sign In
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Share2 className="w-4 h-4" />
-              </Button>
-            </div>
-          }
-        />
-      }
-    >
-      <div className="space-y-lg">
+    <>
+      <Layout
+        header={
+          <Header
+            title={`@${shopHandle}`}
+            actions={
+              <div className="flex items-center gap-sm">
+                <PageViewCounter count={viewCount} />
+
+                {/* Show different actions based on user status */}
+                {!isAuthenticated ? (
+                  // For non-authenticated users (buyers or potential sellers)
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`)}
+                    className="gap-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </Button>
+                ) : isOwner ? (
+                  // For authenticated shop owners
+                  <div className="flex items-center gap-xs">
+                    {ownerData && (
+                      <span className="text-xs text-muted-foreground px-2 py-1 bg-primary/10 rounded">
+                        Owner View
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate('/dashboard')}
+                      className="gap-2"
+                    >
+                      Dashboard
+                    </Button>
+                  </div>
+                ) : (
+                  // For authenticated users viewing someone else's shop
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/dashboard')}
+                    className="gap-2"
+                  >
+                    My Shop
+                  </Button>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success('Shop link copied to clipboard!');
+                  }}
+                >
+                  <Share2 className="w-4 h-4" />
+                </Button>
+              </div>
+            }
+          />
+        }
+      >
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="space-y-lg">
         {/* Shop Header */}
         <div className="text-center space-y-sm">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-            <span className="text-lg font-bold text-primary">
-              {shopHandle.charAt(0).toUpperCase()}
-            </span>
+          {shopData?.profilePhotoUrl ? (
+            <div className="w-20 h-20 mx-auto overflow-hidden rounded-full border-2 border-primary/20">
+              <img
+                src={shopData.profilePhotoUrl}
+                alt={`${shopHandle}'s profile`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto border-2 border-primary/20">
+              <span className="text-xl font-bold text-primary">
+                {shopHandle.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+
+          <div className="space-y-xs">
+            <h1 className="text-xl font-bold text-foreground flex items-center justify-center gap-1">
+              {shopData?.displayName ? shopData.displayName : `@${shopHandle}`}
+              {shopData?.isVerified && (
+                <span className="text-primary text-lg">✓</span>
+              )}
+            </h1>
+
+            <p className="text-sm text-muted-foreground font-medium">
+              TikTok Shop
+            </p>
+
+            {/* TikTok Stats */}
+            <div className="flex items-center justify-center gap-4 text-sm">
+              {shopData?.followerCount && shopData.followerCount > 0 ? (
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold text-foreground">
+                    {shopData.followerCount.toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">followers</span>
+                </div>
+              ) : null}
+
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">{productCount}</span>
+                <span className="text-muted-foreground">products</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">{viewCount}</span>
+                <span className="text-muted-foreground">views</span>
+              </div>
+            </div>
+
+            {/* TikTok Profile Link */}
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://tiktok.com/@${shopHandle}`, '_blank')}
+                className="gap-2 text-xs"
+              >
+                <Video className="w-3 h-3" />
+                View TikTok Profile
+              </Button>
+            </div>
           </div>
-          <h1 className="text-lg font-semibold text-foreground">
-            @{shopHandle}'s Shop
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            buylink.ug/shop/{shopHandle}
-          </p>
         </div>
 
         {/* Empty State */}
@@ -60,32 +327,160 @@ const Shop = () => {
               <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto">
                 <Video className="w-8 h-8 text-muted-foreground" />
               </div>
-              
+
               <div className="space-y-sm">
                 <h2 className="text-base font-semibold text-foreground">
-                  No products yet
+                  {isOwner ? "No products yet" : "Shop coming soon"}
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Post a TikTok video with <span className="font-semibold text-primary">#TRACK</span> to generate your first listing!
+                  {isOwner ? (
+                    <>
+                      Post a TikTok video with <span className="font-semibold text-primary">#TRACK</span> to generate your first listing!
+                    </>
+                  ) : (
+                    <>
+                      @{shopHandle} hasn't added any products yet. Check back soon or follow them on TikTok for updates!
+                    </>
+                  )}
                 </p>
               </div>
 
-              <div className="bg-accent/10 rounded-ds-md p-md space-y-sm">
-                <div className="flex items-center justify-center gap-2 text-accent">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-sm font-medium">How it works:</span>
+              {isOwner && (
+                <div className="bg-accent/10 rounded-ds-md p-md space-y-sm">
+                  <div className="flex items-center justify-center gap-2 text-accent">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-sm font-medium">How it works:</span>
+                  </div>
+                  <ol className="text-xs text-muted-foreground space-y-1">
+                    <li>1. Post your product on TikTok</li>
+                    <li>2. Add #TRACK in your caption</li>
+                    <li>3. We'll auto-generate your product card</li>
+                    <li>4. Share your shop link anywhere!</li>
+                  </ol>
                 </div>
-                <ol className="text-xs text-muted-foreground space-y-1">
-                  <li>1. Post your product on TikTok</li>
-                  <li>2. Add #TRACK in your caption</li>
-                  <li>3. We'll auto-generate your product card</li>
-                  <li>4. Share your shop link anywhere!</li>
-                </ol>
+              )}
+
+              {isOwner ? (
+                <Button
+                  variant="primary"
+                  size="block"
+                  onClick={() => window.open(`https://tiktok.com/@${shopHandle}`, '_blank')}
+                >
+                  Post on TikTok
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="block"
+                  onClick={() => window.open(`https://tiktok.com/@${shopHandle}`, '_blank')}
+                  className="gap-2"
+                >
+                  <Video className="w-4 h-4" />
+                  Follow on TikTok
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Owner Analytics Section (only for authenticated owners) */}
+        {isOwner && ownerData?.analytics && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-lg">
+              <div className="space-y-md">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <h3 className="text-base font-semibold text-foreground">Shop Analytics</h3>
+                  {isFirstTimeSignup && (
+                    <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">
+                      Welcome!
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-md">
+                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
+                    <div className="text-lg font-bold text-foreground">
+                      {ownerData.analytics.views_today}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Today</div>
+                  </div>
+                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
+                    <div className="text-lg font-bold text-foreground">
+                      {ownerData.analytics.views_this_week}
+                    </div>
+                    <div className="text-xs text-muted-foreground">This Week</div>
+                  </div>
+                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
+                    <div className="text-lg font-bold text-foreground">
+                      {ownerData.analytics.views_this_month}
+                    </div>
+                    <div className="text-xs text-muted-foreground">This Month</div>
+                  </div>
+                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
+                    <div className="text-lg font-bold text-foreground">
+                      {ownerData.analytics.total_views}
+                    </div>
+                    <div className="text-xs text-muted-foreground">All Time</div>
+                  </div>
+                </div>
+
+                {isFirstTimeSignup && (
+                  <div className="bg-accent/10 rounded-ds-md p-md space-y-sm">
+                    <div className="flex items-center gap-2 text-accent">
+                      <span className="text-sm font-medium">🎉 Your shop is now live!</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Start posting TikTok videos with #TRACK to add products to your shop.
+                      Share your shop link to start getting visitors!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sign Up Prompt for Non-Authenticated Users */}
+        {!isAuthenticated && (
+          <Card className="mx-auto max-w-md border-primary/20 bg-primary/5">
+            <CardContent className="p-lg text-center space-y-md">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <LogIn className="w-6 h-6 text-primary" />
               </div>
 
-              <Button variant="primary" size="block">
-                Learn How It Works
-              </Button>
+              <div className="space-y-sm">
+                <h3 className="text-base font-semibold text-foreground">
+                  Are you {shopData?.displayName || `@${shopHandle}`}?
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  If this is your TikTok handle, sign in to access your shop dashboard and analytics.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Or create your own shop and start selling from your TikTok videos!
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="primary"
+                  size="block"
+                  onClick={() => navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`)}
+                  className="gap-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In as @{shopHandle}
+                </Button>
+                <div className="text-xs text-muted-foreground my-2">or</div>
+                <Button
+                  variant="outline"
+                  size="block"
+                  onClick={() => navigate('/')}
+                  className="gap-2"
+                >
+                  Create My Own Shop
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -109,8 +504,18 @@ const Shop = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
     </Layout>
+
+    {/* Subscription Prompt Modal */}
+    <SubscriptionPrompt
+      isOpen={showSubscriptionPrompt}
+      onClose={() => setShowSubscriptionPrompt(false)}
+      handle={shopHandle}
+      onSubscribe={handleSubscriptionComplete}
+    />
+  </>
   );
 };
 

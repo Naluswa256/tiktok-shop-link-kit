@@ -35,6 +35,27 @@ variable "openai_api_key" {
   default     = ""
 }
 
+# Cognito Configuration
+variable "cognito_sms_external_id" {
+  description = "External ID for Cognito SMS role"
+  type        = string
+  default     = ""
+}
+
+# Apify Configuration
+variable "apify_token" {
+  description = "Apify API token for TikTok scraping"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "apify_actor_id" {
+  description = "Apify actor ID for TikTok profile scraper"
+  type        = string
+  default     = "clockworks/tiktok-profile-scraper"
+}
+
 # Database Configuration
 variable "dynamodb_billing_mode" {
   description = "DynamoDB billing mode"

@@ -23,3 +23,26 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# Lambda deployment packages (build artifacts)
+*.zip
+
+# AI Workers build artifacts
+apps/ai-workers/*/dist/
+apps/ai-workers/*/node_modules/
+apps/ai-workers/*/*.zip
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/

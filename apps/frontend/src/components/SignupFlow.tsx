@@ -1,11 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input } from '@/components/tiktok-commerce';
-import { ArrowRight, ArrowLeft, Check, Phone, AtSign, ExternalLink } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Phone, AtSign, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { useAuthFlow } from '@/hooks/useAuth';
+import { cleanTikTokHandle } from '@/lib/api';
+import { toast } from 'sonner';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
+
+interface ValidationState {
+  isValid: boolean;
+  isValidating: boolean;
+  message?: string;
+}
 
 export const SignupFlow = () => {
   const navigate = useNavigate();
@@ -13,18 +23,67 @@ export const SignupFlow = () => {
   const [formData, setFormData] = useState({
     tiktokHandle: '',
     phoneNumber: '',
-    countryCode: '+256' // Default to Uganda
+    countryCode: '+256', // Default to Uganda
+    otpCode: ''
   });
 
-  const handleNext = () => {
-    if (currentStep < 3) {
-      setCurrentStep((prev) => (prev + 1) as Step);
+  const [handleValidation, setHandleValidation] = useState<ValidationState>({
+    isValid: false,
+    isValidating: false
+  });
+
+  const { validateHandle, signup, verifySignup, checkAndPromptSubscription, isLoading } = useAuthFlow();
+
+  // Handle TikTok handle validation and proceed to next step
+  const handleValidateAndNext = async () => {
+    if (currentStep === 1) {
+      setHandleValidation({ isValid: false, isValidating: true });
+
+      try {
+        const result = await validateHandle.mutateAsync(formData.tiktokHandle);
+        if (result.data.exists) {
+          setHandleValidation({
+            isValid: true,
+            isValidating: false,
+            message: `✓ Found @${cleanTikTokHandle(formData.tiktokHandle)}`
+          });
+          setCurrentStep(2);
+        } else {
+          setHandleValidation({
+            isValid: false,
+            isValidating: false,
+            message: 'Handle not found on TikTok'
+          });
+        }
+      } catch (error) {
+        setHandleValidation({
+          isValid: false,
+          isValidating: false,
+          message: 'Failed to validate handle'
+        });
+      }
+    } else if (currentStep === 2) {
+      // Send OTP
+      try {
+        await signup.mutateAsync({
+          handle: formData.tiktokHandle,
+          phoneNumber: formData.phoneNumber,
+          countryCode: formData.countryCode
+        });
+        setCurrentStep(3);
+      } catch (error) {
+        // Error is handled by the hook
+      }
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => (prev - 1) as Step);
+      // Reset validation state when going back
+      if (currentStep === 2) {
+        setHandleValidation({ isValid: false, isValidating: false });
+      }
     }
   };
 
@@ -33,16 +92,69 @@ export const SignupFlow = () => {
       ...prev,
       [field]: value
     }));
+
+    // Reset handle validation when handle changes
+    if (field === 'tiktokHandle') {
+      setHandleValidation({ isValid: false, isValidating: false });
+    }
+  };
+
+  // Handle OTP verification
+  const handleVerifyOTP = async () => {
+    try {
+      await verifySignup.mutateAsync({
+        handle: formData.tiktokHandle,
+        phoneNumber: formData.phoneNumber,
+        countryCode: formData.countryCode,
+        code: formData.otpCode
+      });
+
+      // Check if user needs subscription
+      const needsSubscription = checkAndPromptSubscription(cleanTikTokHandle(formData.tiktokHandle));
+
+      if (!needsSubscription) {
+        // Go directly to shop page
+        navigate(`/shop/${cleanTikTokHandle(formData.tiktokHandle)}`);
+      }
+    } catch (error) {
+      // Error is handled by the hook
+    }
   };
 
   const isStepValid = () => {
     switch (currentStep) {
       case 1:
-        return formData.tiktokHandle.length > 0;
+        return formData.tiktokHandle.length > 0 && !handleValidation.isValidating;
       case 2:
         return formData.phoneNumber.length >= 9;
       case 3:
-        return true;
+        return formData.otpCode.length === 6;
+      default:
+        return false;
+    }
+  };
+
+  const getStepButtonText = () => {
+    switch (currentStep) {
+      case 1:
+        return handleValidation.isValidating ? 'Validating...' : 'Validate Handle';
+      case 2:
+        return signup.isPending ? 'Sending...' : 'Send Code';
+      case 3:
+        return verifySignup.isPending ? 'Verifying...' : 'Verify & Continue';
+      default:
+        return 'Continue';
+    }
+  };
+
+  const isStepLoading = () => {
+    switch (currentStep) {
+      case 1:
+        return handleValidation.isValidating;
+      case 2:
+        return signup.isPending;
+      case 3:
+        return verifySignup.isPending;
       default:
         return false;
     }
@@ -104,17 +216,41 @@ export const SignupFlow = () => {
                   </div>
                   <h3 className="text-lg font-semibold">Enter Your TikTok Handle</h3>
                   <p className="text-sm text-muted-foreground">
-                    We'll use this to find your videos and create your shop
+                    We'll verify your handle exists on TikTok
                   </p>
                 </div>
 
-                <Input
-                  label="TikTok Handle"
-                  placeholder="@yourhandle"
-                  value={formData.tiktokHandle}
-                  onChange={(e) => handleInputChange('tiktokHandle', e.target.value)}
-                  helper="Include the @ symbol"
-                />
+                <div className="space-y-sm">
+                  <Input
+                    label="TikTok Handle"
+                    placeholder="@yourhandle"
+                    value={formData.tiktokHandle}
+                    onChange={(e) => handleInputChange('tiktokHandle', e.target.value)}
+                    helper={handleValidation.message || "Include the @ symbol"}
+                    error={handleValidation.message && !handleValidation.isValid ? handleValidation.message : undefined}
+                  />
+
+                  {handleValidation.isValidating && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Checking TikTok handle...
+                    </div>
+                  )}
+
+                  {handleValidation.isValid && (
+                    <div className="flex items-center gap-2 text-sm text-success">
+                      <CheckCircle className="w-4 h-4" />
+                      {handleValidation.message}
+                    </div>
+                  )}
+
+                  {handleValidation.message && !handleValidation.isValid && !handleValidation.isValidating && (
+                    <div className="flex items-center gap-2 text-sm text-error">
+                      <XCircle className="w-4 h-4" />
+                      {handleValidation.message}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -159,32 +295,50 @@ export const SignupFlow = () => {
             {currentStep === 3 && (
               <div className="space-y-md">
                 <div className="text-center space-y-sm">
-                  <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto">
-                    <Check className="w-6 h-6 text-success" />
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                    <Phone className="w-6 h-6 text-primary" />
                   </div>
-                  <h3 className="text-lg font-semibold text-success">You're In!</h3>
+                  <h3 className="text-lg font-semibold">Enter Verification Code</h3>
                   <p className="text-sm text-muted-foreground">
-                    Preview your shop link below
+                    We sent a 6-digit code to {formData.countryCode} {formData.phoneNumber}
                   </p>
                 </div>
 
-                <div className="bg-muted/50 rounded-ds-md p-md space-y-sm">
-                  <p className="text-sm font-medium">Your Shop Link:</p>
-                  <div className="flex items-center gap-sm p-sm bg-background rounded-ds-sm border">
-                    <code className="text-sm text-primary flex-1">buylink.ug/shop/{formData.tiktokHandle.replace('@', '')}</code>
-                    <Button variant="ghost" size="sm" onClick={handleVisitLink}>
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                <div className="space-y-md">
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={formData.otpCode}
+                      onChange={(value) => handleInputChange('otpCode', value)}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Share this link anywhere - Instagram bio, WhatsApp status, or SMS
-                  </p>
-                </div>
 
-                <div className="text-center">
-                  <Button variant="primary" size="block" onClick={handleCompleteSetup}>
-                    Complete Setup
-                  </Button>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline"
+                      onClick={() => {
+                        // Resend OTP
+                        signup.mutate({
+                          handle: formData.tiktokHandle,
+                          phoneNumber: formData.phoneNumber,
+                          countryCode: formData.countryCode
+                        });
+                      }}
+                      disabled={signup.isPending}
+                    >
+                      {signup.isPending ? 'Sending...' : 'Resend code'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -196,7 +350,7 @@ export const SignupFlow = () => {
               <Button
                 variant="ghost"
                 onClick={handleBack}
-                disabled={currentStep === 1}
+                disabled={currentStep === 1 || isStepLoading()}
                 className="gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -205,24 +359,49 @@ export const SignupFlow = () => {
 
               <Button
                 variant="primary"
-                onClick={handleNext}
-                disabled={!isStepValid()}
+                onClick={handleValidateAndNext}
+                disabled={!isStepValid() || isStepLoading()}
                 className="gap-2"
               >
-                {currentStep === 2 ? 'Finish' : 'Continue'}
-                <ArrowRight className="w-4 h-4" />
+                {isStepLoading() && <Loader2 className="w-4 h-4 animate-spin" />}
+                {getStepButtonText()}
+                {!isStepLoading() && <ArrowRight className="w-4 h-4" />}
+              </Button>
+            </div>
+          )}
+
+          {/* OTP Verification Button */}
+          {currentStep === 3 && (
+            <div className="flex justify-between items-center pt-md">
+              <Button
+                variant="ghost"
+                onClick={handleBack}
+                disabled={verifySignup.isPending}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={handleVerifyOTP}
+                disabled={!isStepValid() || verifySignup.isPending}
+                className="gap-2"
+              >
+                {verifySignup.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {verifySignup.isPending ? 'Verifying...' : 'Verify & Continue'}
+                {!verifySignup.isPending && <ArrowRight className="w-4 h-4" />}
               </Button>
             </div>
           )}
 
           {/* No Password Note */}
-          {currentStep < 3 && (
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">
-                🔒 No passwords required - we keep it simple
-              </p>
-            </div>
-          )}
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">
+              🔒 No passwords required - we keep it simple
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

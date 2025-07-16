@@ -12,6 +12,7 @@ numpy==1.26.4
 # AI/ML dependencies
 torch==2.4.0
 torchvision==0.19.0
+ultralytics==8.0.196
 diffusers==0.30.0
 
 # AWS Lambda dependencies

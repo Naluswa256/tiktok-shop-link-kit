@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import {
   DynamoDBClient,
   PutItemCommand,
-  GetItemCommand,
   UpdateItemCommand,
   QueryCommand,
 } from '@aws-sdk/client-dynamodb';
@@ -44,29 +43,46 @@ export class ShopService implements ShopServiceInterface {
    * Create a new shop entry and emit ShopLinkGeneratedEvent
    */
   async createShop(shopData: CreateShopInput): Promise<Shop> {
-    const now = new Date().toISOString();
+    const now = shopData.createdAt || new Date().toISOString();
     const shopLink = `/shop/${shopData.handle}`;
 
     const shop: Shop = {
       handle: shopData.handle,
-      phone: shopData.phone,
+      phone: shopData.phone || '', // Handle optional phone for password-based auth
       shop_link: shopLink,
       subscription_status: shopData.subscription_status || 'trial',
       created_at: now,
-      user_id: shopData.user_id,
+      user_id: shopData.user_id || shopData.userId, // Support both field names
       display_name: shopData.display_name,
       profile_photo_url: shopData.profile_photo_url,
       follower_count: shopData.follower_count,
       is_verified: shopData.is_verified,
     };
 
-    // Create DynamoDB item
+    // Create DynamoDB item with proper PK/SK structure
+    const shopId = shop.user_id || `SHOP#${shop.handle}`;
     const dynamoItem = {
+      // Primary keys for DynamoDB
+      PK: `SHOP#${shopId}`,
+      SK: `SHOP#${shopId}`,
+
+      // GSI keys for lookups
+      GSI1PK: `HANDLE#${shop.handle}`,
+      GSI1SK: `SHOP#${shopId}`,
+      ...(shop.user_id && {
+        GSI2PK: `USER#${shop.user_id}`,
+        GSI2SK: `SHOP#${shopId}`,
+      }),
+
+      // Entity type
+      EntityType: 'SHOP',
+
+      // Shop data
       handle: shop.handle,
-      phone: shop.phone,
       shop_link: shop.shop_link,
       subscription_status: shop.subscription_status,
       created_at: shop.created_at,
+      ...(shop.phone && { phone: shop.phone }), // Only include phone if provided
       ...(shop.user_id && { user_id: shop.user_id }),
       ...(shop.display_name && { display_name: shop.display_name }),
       ...(shop.profile_photo_url && { profile_photo_url: shop.profile_photo_url }),
@@ -79,8 +95,8 @@ export class ShopService implements ShopServiceInterface {
       await this.dynamoClient.send(
         new PutItemCommand({
           TableName: this.shopsTableName,
-          Item: marshall(dynamoItem),
-          ConditionExpression: 'attribute_not_exists(handle)', // Prevent duplicates
+          Item: marshall(dynamoItem, { removeUndefinedValues: true }),
+          ConditionExpression: 'attribute_not_exists(PK)', // Prevent duplicates
         })
       );
 
@@ -102,17 +118,22 @@ export class ShopService implements ShopServiceInterface {
   async getShopByHandle(handle: string): Promise<Shop | null> {
     try {
       const result = await this.dynamoClient.send(
-        new GetItemCommand({
+        new QueryCommand({
           TableName: this.shopsTableName,
-          Key: marshall({ handle }),
+          IndexName: 'GSI1',
+          KeyConditionExpression: 'GSI1PK = :gsi1pk',
+          ExpressionAttributeValues: marshall({
+            ':gsi1pk': `HANDLE#${handle}`,
+          }),
+          Limit: 1,
         })
       );
 
-      if (!result.Item) {
+      if (!result.Items || result.Items.length === 0) {
         return null;
       }
 
-      return unmarshall(result.Item) as Shop;
+      return unmarshall(result.Items[0]) as Shop;
     } catch (error) {
       this.logger.error(`Failed to get shop by handle: ${handle}`, error);
       throw error;
@@ -152,16 +173,27 @@ export class ShopService implements ShopServiceInterface {
    */
   async updateShopSubscription(handle: string, subscriptionStatus: 'trial' | 'paid'): Promise<void> {
     try {
+      // First, get the shop to find its PK/SK
+      const shop = await this.getShopByHandle(handle);
+      if (!shop) {
+        throw new Error(`Shop not found: ${handle}`);
+      }
+
+      const shopId = shop.user_id || `SHOP#${handle}`;
+
       await this.dynamoClient.send(
         new UpdateItemCommand({
           TableName: this.shopsTableName,
-          Key: marshall({ handle }),
+          Key: marshall({
+            PK: `SHOP#${shopId}`,
+            SK: `SHOP#${shopId}`,
+          }),
           UpdateExpression: 'SET subscription_status = :status, updated_at = :updatedAt',
           ExpressionAttributeValues: marshall({
             ':status': subscriptionStatus,
             ':updatedAt': new Date().toISOString(),
           }),
-          ConditionExpression: 'attribute_exists(handle)',
+          ConditionExpression: 'attribute_exists(PK)',
         })
       );
 
@@ -210,10 +242,10 @@ export class ShopService implements ShopServiceInterface {
 
     const event: ShopLinkGeneratedEvent = {
       handle: shop.handle,
-      phone: shop.phone,
       shop_link: shop.shop_link,
       subscription_status: shop.subscription_status,
       created_at: shop.created_at,
+      ...(shop.phone && { phone: shop.phone }), // Only include phone if provided
     };
 
     try {

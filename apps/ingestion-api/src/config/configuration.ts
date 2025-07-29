@@ -19,6 +19,7 @@ export interface AwsConfig {
 export interface CognitoConfig {
   userPoolId: string;
   clientId: string;
+  clientSecret?: string; // Optional for public clients
   region: string;
 }
 
@@ -63,6 +64,7 @@ export const configValidationSchema = Joi.object({
   // Cognito configuration
   COGNITO_USER_POOL_ID: Joi.string().required(),
   COGNITO_CLIENT_ID: Joi.string().required(),
+  COGNITO_CLIENT_SECRET: Joi.string().optional(), // Optional for public clients
   COGNITO_REGION: Joi.string().default('us-east-1'),
 
   // JWT configuration
@@ -96,6 +98,7 @@ export const awsConfig = registerAs('aws', (): AwsConfig => ({
 export const cognitoConfig = registerAs('cognito', (): CognitoConfig => ({
   userPoolId: process.env.COGNITO_USER_POOL_ID!,
   clientId: process.env.COGNITO_CLIENT_ID!,
+  clientSecret: process.env.COGNITO_CLIENT_SECRET, // Optional for public clients
   region: process.env.COGNITO_REGION || process.env.AWS_REGION || 'us-east-1',
 }));
 
@@ -158,6 +161,7 @@ export const loadConfiguration = (): Configuration => {
     cognito: {
       userPoolId: process.env.COGNITO_USER_POOL_ID!,
       clientId: process.env.COGNITO_CLIENT_ID!,
+      clientSecret: process.env.COGNITO_CLIENT_SECRET, // Optional for public clients
       region: process.env.COGNITO_REGION || process.env.AWS_REGION || 'us-east-1',
     },
     jwt: {

@@ -8,12 +8,12 @@ terraform {
     }
   }
 
-  backend "s3" {
-    # Configure this in terraform init or backend config file
-    # bucket = "your-terraform-state-bucket"
-    # key    = "tiktok-commerce/terraform.tfstate"
-    # region = "us-east-1"
-  }
+  # backend "s3" {
+  #   # Configure this in terraform init or backend config file
+  #   # bucket = "buylink-us-east-1"
+  #   # key    = "tiktok-commerce/terraform.tfstate"
+  #   region = "us-east-1"
+  # }
 }
 
 provider "aws" {
@@ -680,113 +680,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "product_thumbnails_lifecycle" 
   }
 }
 
-# AI Workers (Lambda Functions)
-module "lambda_caption_parser" {
-  source = "./modules/ai_worker"
-
-  function_name = "${local.name_prefix}-caption-parser"
-  description   = "AI worker for parsing TikTok video captions using LLM"
-
-  source_dir = "../../apps/ai-workers/caption-parser"
-  handler    = "index.lambdaHandler"
-  runtime    = "nodejs18.x"
-  timeout    = 300
-  memory_size = 512
-
-  environment_variables = {
-    NODE_ENV                = var.environment
-    AWS_REGION              = var.aws_region
-    SQS_QUEUE_URL          = module.sqs_caption_parser.queue_url
-    SNS_TOPIC_ARN          = module.sns_caption_parsed.topic_arn
-    LLM_PROVIDER           = var.llm_provider
-    LLM_MODEL              = var.llm_model
-    OPENROUTER_API_KEY     = var.openrouter_api_key
-    OLLAMA_BASE_URL        = var.ollama_base_url
-    BATCH_SIZE             = "5"
-    MAX_RETRIES            = "3"
-    VISIBILITY_TIMEOUT     = "300"
-    WAIT_TIME_SECONDS      = "20"
-  }
-
-  event_source_arn = module.sqs_caption_parser.queue_arn
-
-  tags = local.common_tags
-}
-
-module "lambda_thumbnail_generator" {
-  source = "./modules/ai_worker"
-  
-  function_name = "${local.name_prefix}-thumbnail-generator"
-  description   = "AI worker for generating product thumbnails"
-  
-  source_dir = "../../apps/ai-workers/thumbnail-generator"
-  handler    = "index.lambdaHandler"
-  runtime    = "nodejs18.x"
-  timeout    = 900  # 15 minutes for video processing
-  memory_size = 1024
-
-  environment_variables = {
-    NODE_ENV                        = var.environment
-    AWS_REGION                      = var.aws_region
-    SQS_QUEUE_URL                  = module.sqs_thumbnail_generator.queue_url
-    SNS_TOPIC_ARN                  = module.sns_thumbnail_generated.topic_arn
-    S3_BUCKET_NAME                 = aws_s3_bucket.product_thumbnails.bucket
-    MAX_VIDEO_SIZE_MB              = "50"
-    MAX_VIDEO_DURATION_SECONDS     = "60"
-    FRAME_EXTRACTION_INTERVAL      = "2"
-    MAX_FRAMES_TO_ANALYZE          = "15"
-    THUMBNAILS_TO_GENERATE         = "5"
-    YOLO_MODEL_PATH                = "yolov8n.pt"
-    YOLO_CONFIDENCE_THRESHOLD      = "0.5"
-    YOLO_IOU_THRESHOLD             = "0.5"
-    MIN_QUALITY_SCORE              = "0.4"
-    MIN_BRIGHTNESS_SCORE           = "0.3"
-    MAX_BLUR_SCORE                 = "0.7"
-    THUMBNAIL_WIDTH                = "400"
-    THUMBNAIL_HEIGHT               = "400"
-    THUMBNAIL_QUALITY              = "85"
-    BATCH_SIZE                     = "1"
-    MAX_RETRIES                    = "3"
-    VISIBILITY_TIMEOUT             = "900"
-    WAIT_TIME_SECONDS              = "20"
-  }
-  
-  event_source_arn = module.sqs_thumbnail_generation.queue_arn
-  
-  tags = local.common_tags
-}
-
-module "lambda_auto_tagger" {
-  source = "./modules/ai_worker"
-  
-  function_name = "${local.name_prefix}-auto-tagger"
-  description   = "AI worker for auto-tagging content"
-  
-  source_dir = "../../apps/ai-workers/auto-tagger"
-  handler    = "index.lambdaHandler"
-  runtime    = "nodejs18.x"
-  timeout    = 300
-  memory_size = 512
-
-  environment_variables = {
-    NODE_ENV                = var.environment
-    AWS_REGION              = var.aws_region
-    SQS_QUEUE_URL          = module.sqs_auto_tagger.queue_url
-    SNS_TOPIC_ARN          = module.sns_tags_generated.topic_arn
-    LLM_PROVIDER           = var.llm_provider
-    LLM_MODEL              = var.llm_model
-    OPENROUTER_API_KEY     = var.openrouter_api_key
-    OLLAMA_BASE_URL        = var.ollama_base_url
-    BATCH_SIZE             = "10"
-    MAX_RETRIES            = "3"
-    VISIBILITY_TIMEOUT     = "300"
-    WAIT_TIME_SECONDS      = "20"
-  }
-  
-  event_source_arn = module.sqs_auto_tagging.queue_arn
-  
-  tags = local.common_tags
-}
+# AI Workers removed for authentication-only deployment
 
 # NestJS Services (ECS or Lambda)
 module "ingestion_api" {

@@ -24,6 +24,18 @@ export interface ValidateHandleResponse {
   requestId: string;
 }
 
+// Password-based authentication types
+export interface PasswordSignupRequest {
+  handle: string;
+  password: string;
+}
+
+export interface PasswordSigninRequest {
+  handle: string;
+  password: string;
+}
+
+// Legacy phone-based types (keeping for backward compatibility)
 export interface SignupRequest {
   handle: string;
   phoneNumber: string;
@@ -38,6 +50,40 @@ export interface OtpData {
   };
 }
 
+// Password-based signup response
+export interface PasswordSignupResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    shopLink: string;
+    message: string;
+  };
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
+// Password-based signin response
+export interface PasswordSigninResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+    expiresIn: number;
+    user: {
+      handle: string;
+      userId: string;
+      subscriptionStatus: string;
+    };
+  };
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
+// Legacy phone-based signup response
 export interface SignupResponse {
   success: boolean;
   data: OtpData;
@@ -223,6 +269,22 @@ export const authApi = {
   // Validate TikTok handle - POST /auth/validate-handle
   validateHandle: async (request: ValidateHandleRequest): Promise<ValidateHandleResponse> => {
     return apiRequest<ValidateHandleResponse>('/auth/validate-handle', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  // Password-based signup - POST /auth/password/signup
+  passwordSignup: async (request: PasswordSignupRequest): Promise<PasswordSignupResponse> => {
+    return apiRequest<PasswordSignupResponse>('/auth/password/signup', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  // Password-based signin - POST /auth/password/signin
+  passwordSignin: async (request: PasswordSigninRequest): Promise<PasswordSigninResponse> => {
+    return apiRequest<PasswordSigninResponse>('/auth/password/signin', {
       method: 'POST',
       body: JSON.stringify(request),
     });

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
+import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
 
 export interface IngestionMetrics {
   shopsProcessed: number;
@@ -40,43 +40,43 @@ export class MonitoringService {
         {
           MetricName: 'ShopsProcessed',
           Value: metrics.shopsProcessed,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'VideosFound',
           Value: metrics.videosFound,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'NewVideosProcessed',
           Value: metrics.newVideosProcessed,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'EventsEmitted',
           Value: metrics.eventsEmitted,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'Errors',
           Value: metrics.errors,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'ApifyUsage',
           Value: metrics.apifyUsage,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
         },
         {
           MetricName: 'Duration',
           Value: metrics.duration,
-          Unit: 'Milliseconds',
+          Unit: StandardUnit.Milliseconds,
           Timestamp: new Date(),
         },
       ];
@@ -104,7 +104,7 @@ export class MonitoringService {
         {
           MetricName: 'IngestionErrors',
           Value: 1,
-          Unit: 'Count',
+          Unit: StandardUnit.Count,
           Timestamp: new Date(),
           Dimensions: [
             {
@@ -138,7 +138,7 @@ export class MonitoringService {
   async sendCustomMetric(
     metricName: string,
     value: number,
-    unit: string = 'Count',
+    unit: StandardUnit = StandardUnit.Count,
     dimensions: Array<{ Name: string; Value: string }> = []
   ): Promise<void> {
     try {

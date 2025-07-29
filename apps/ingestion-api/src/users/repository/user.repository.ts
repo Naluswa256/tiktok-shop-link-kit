@@ -39,40 +39,46 @@ export class UserRepository implements UserRepositoryInterface {
 
   async createUser(userData: CreateUserInput): Promise<User> {
     const userId = uuidv4();
-    const now = new Date().toISOString();
+    const now = userData.createdAt || new Date().toISOString();
     const shopLink = `/shop/${userData.handle}`;
 
     const user: User = {
       userId,
       handle: userData.handle,
-      phoneNumber: userData.phoneNumber,
+      phoneNumber: userData.phoneNumber || '', // Handle optional phone number
       shopLink,
-      subscriptionStatus: SubscriptionStatus.PENDING,
+      subscriptionStatus: userData.subscriptionStatus || SubscriptionStatus.PENDING,
       profilePhotoUrl: userData.profilePhotoUrl,
       displayName: userData.displayName,
       followerCount: userData.followerCount,
       isVerified: userData.isVerified,
       cognitoUserId: userData.cognitoUserId,
+      trialEndDate: userData.trialEndsAt,
       createdAt: now,
       updatedAt: now,
     };
 
+    // Build DynamoDB item with conditional GSI2 for phone number
     const dynamoItem: UserDynamoDBItem = {
       PK: `USER#${userId}`,
       SK: `USER#${userId}`,
       GSI1PK: `HANDLE#${userData.handle}`,
       GSI1SK: `USER#${userId}`,
-      GSI2PK: `PHONE#${userData.phoneNumber}`,
-      GSI2SK: `USER#${userId}`,
       EntityType: 'USER',
       ...user,
     };
+
+    // Only add phone GSI if phone number is provided
+    if (userData.phoneNumber) {
+      dynamoItem.GSI2PK = `PHONE#${userData.phoneNumber}`;
+      dynamoItem.GSI2SK = `USER#${userId}`;
+    }
 
     try {
       await this.dynamoClient.send(
         new PutItemCommand({
           TableName: this.tableName,
-          Item: marshall(dynamoItem),
+          Item: marshall(dynamoItem, { removeUndefinedValues: true }),
           ConditionExpression: 'attribute_not_exists(PK)',
         })
       );
@@ -219,7 +225,7 @@ export class UserRepository implements UserRepositoryInterface {
           }),
           UpdateExpression: `SET ${updateExpression.join(', ')}`,
           ExpressionAttributeNames: expressionAttributeNames,
-          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          ExpressionAttributeValues: marshall(expressionAttributeValues, { removeUndefinedValues: true }),
           ConditionExpression: 'attribute_exists(PK)',
         })
       );
@@ -310,8 +316,8 @@ export class UserRepository implements UserRepositoryInterface {
         command = new QueryCommand({
           TableName: this.tableName,
           FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
-          ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 
-            ? marshall(expressionAttributeValues) 
+          ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0
+            ? marshall(expressionAttributeValues, { removeUndefinedValues: true })
             : undefined,
           Limit: limit,
         });

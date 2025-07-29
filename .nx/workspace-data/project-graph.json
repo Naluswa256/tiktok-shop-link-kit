@@ -1,0 +1,2877 @@
+{
+  "nodes": {
+    "undefined": {
+      "name": "undefined",
+      "type": "lib",
+      "data": {
+        "root": "apps/ai-workers/thumbnail-generator",
+        "targets": {
+          "lint": {
+            "cache": true,
+            "options": {
+              "cwd": "apps/ai-workers/thumbnail-generator",
+              "command": "eslint ."
+            },
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "outputs": [
+              "{options.outputFile}"
+            ],
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": [],
+        "tags": []
+      }
+    },
+    "product-service": {
+      "name": "product-service",
+      "type": "lib",
+      "data": {
+        "root": "apps/product-service",
+        "targets": {
+          "lint": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "lint"
+            },
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              },
+              "scriptContent": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+              "runCommand": "bun run lint -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "cache": true
+          },
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "nest build",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "cache": true
+          },
+          "format": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "format"
+            },
+            "metadata": {
+              "scriptContent": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+              "runCommand": "bun run format -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "start": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start"
+            },
+            "metadata": {
+              "scriptContent": "nest start",
+              "runCommand": "bun run start -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "dev"
+            },
+            "metadata": {
+              "scriptContent": "nest start --watch",
+              "runCommand": "bun run dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "start:debug": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start:debug"
+            },
+            "metadata": {
+              "scriptContent": "nest start --debug --watch",
+              "runCommand": "bun run start:debug -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "start:prod": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start:prod"
+            },
+            "metadata": {
+              "scriptContent": "node dist/main",
+              "runCommand": "bun run start:prod -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test"
+            },
+            "metadata": {
+              "scriptContent": "jest",
+              "runCommand": "bun run test -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "^production",
+              "{workspaceRoot}/jest.preset.js"
+            ],
+            "cache": true
+          },
+          "test:watch": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:watch"
+            },
+            "metadata": {
+              "scriptContent": "jest --watch",
+              "runCommand": "bun run test:watch -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:cov": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:cov"
+            },
+            "metadata": {
+              "scriptContent": "jest --coverage",
+              "runCommand": "bun run test:cov -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:debug": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:debug"
+            },
+            "metadata": {
+              "scriptContent": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+              "runCommand": "bun run test:debug -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:e2e": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:e2e"
+            },
+            "metadata": {
+              "scriptContent": "jest --config ./test/jest-e2e.json",
+              "runCommand": "bun run test:e2e -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "name": "product-service",
+        "tags": [
+          "npm:private"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "format",
+              "start",
+              "dev",
+              "start:debug",
+              "start:prod",
+              "lint",
+              "test",
+              "test:watch",
+              "test:cov",
+              "test:debug",
+              "test:e2e"
+            ]
+          },
+          "description": "TikTok Commerce Link Hub - Product Service",
+          "js": {
+            "packageName": "product-service",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "ingestion-api": {
+      "name": "ingestion-api",
+      "type": "lib",
+      "data": {
+        "root": "apps/ingestion-api",
+        "targets": {
+          "lint": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "lint"
+            },
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              },
+              "scriptContent": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+              "runCommand": "bun run lint -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "cache": true
+          },
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "nest build",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "cache": true
+          },
+          "format": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "format"
+            },
+            "metadata": {
+              "scriptContent": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+              "runCommand": "bun run format -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "start": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start"
+            },
+            "metadata": {
+              "scriptContent": "nest start",
+              "runCommand": "bun run start -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "dev"
+            },
+            "metadata": {
+              "scriptContent": "nest start --watch",
+              "runCommand": "bun run dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "start:debug": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start:debug"
+            },
+            "metadata": {
+              "scriptContent": "nest start --debug --watch",
+              "runCommand": "bun run start:debug -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "start:prod": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start:prod"
+            },
+            "metadata": {
+              "scriptContent": "node dist/main",
+              "runCommand": "bun run start:prod -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test"
+            },
+            "metadata": {
+              "scriptContent": "jest",
+              "runCommand": "bun run test -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "^production",
+              "{workspaceRoot}/jest.preset.js"
+            ],
+            "cache": true
+          },
+          "test:watch": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:watch"
+            },
+            "metadata": {
+              "scriptContent": "jest --watch",
+              "runCommand": "bun run test:watch -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:cov": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:cov"
+            },
+            "metadata": {
+              "scriptContent": "jest --coverage",
+              "runCommand": "bun run test:cov -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:debug": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:debug"
+            },
+            "metadata": {
+              "scriptContent": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+              "runCommand": "bun run test:debug -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "test:e2e": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test:e2e"
+            },
+            "metadata": {
+              "scriptContent": "jest --config ./test/jest-e2e.json",
+              "runCommand": "bun run test:e2e -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "name": "ingestion-api",
+        "tags": [
+          "npm:private"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "format",
+              "start",
+              "dev",
+              "start:debug",
+              "start:prod",
+              "lint",
+              "test",
+              "test:watch",
+              "test:cov",
+              "test:debug",
+              "test:e2e"
+            ]
+          },
+          "description": "TikTok Commerce Link Hub - Ingestion API Service",
+          "js": {
+            "packageName": "ingestion-api",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "frontend": {
+      "name": "frontend",
+      "type": "app",
+      "data": {
+        "root": "apps/frontend",
+        "targets": {
+          "lint": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "lint"
+            },
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              },
+              "scriptContent": "eslint .",
+              "runCommand": "bun run lint -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "cache": true
+          },
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Run Vite build",
+              "help": {
+                "command": "bun vite build --help",
+                "example": {
+                  "options": {
+                    "sourcemap": true,
+                    "manifest": "manifest.json"
+                  }
+                }
+              },
+              "scriptContent": "vite build",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "cache": true
+          },
+          "serve": {
+            "options": {
+              "cwd": "apps/frontend",
+              "command": "vite"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Starts Vite dev server",
+              "help": {
+                "command": "bun vite --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              },
+              "deprecated": "Use devTargetName instead. This option will be removed in Nx 22."
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "dev"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Starts Vite dev server",
+              "help": {
+                "command": "bun vite --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              },
+              "scriptContent": "vite",
+              "runCommand": "bun run dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "preview": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "preview"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Locally preview Vite production build",
+              "help": {
+                "command": "bun vite preview --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              },
+              "scriptContent": "vite preview",
+              "runCommand": "bun run preview -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "serve-static": {
+            "executor": "@nx/web:file-server",
+            "options": {
+              "buildTarget": "build",
+              "spa": true
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "typecheck": {
+            "cache": true,
+            "inputs": [
+              "production",
+              "^production",
+              {
+                "externalDependencies": [
+                  "typescript"
+                ]
+              }
+            ],
+            "options": {
+              "cwd": "apps/frontend",
+              "command": "tsc --noEmit -p tsconfig.json"
+            },
+            "metadata": {
+              "description": "Runs type-checking for the project.",
+              "technologies": [
+                "typescript"
+              ],
+              "help": {
+                "command": "bun tsc -p tsconfig.json --help",
+                "example": {
+                  "options": {
+                    "noEmit": true
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "build-deps": {
+            "dependsOn": [
+              "^build"
+            ],
+            "configurations": {},
+            "options": {},
+            "parallelism": true,
+            "executor": "nx:noop"
+          },
+          "watch-deps": {
+            "dependsOn": [
+              "build-deps"
+            ],
+            "executor": "nx:run-commands",
+            "options": {
+              "command": "bun nx watch --projects frontend --includeDependentProjects -- bun nx build-deps frontend"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "build:dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build:dev"
+            },
+            "metadata": {
+              "scriptContent": "vite build --mode development",
+              "runCommand": "bun run build:dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "type-check": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "type-check"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run type-check -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "^production"
+            ],
+            "cache": true
+          }
+        },
+        "projectType": "application",
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "dev",
+              "build",
+              "build:dev",
+              "lint",
+              "preview",
+              "type-check"
+            ]
+          },
+          "js": {
+            "packageName": "frontend",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "name": "frontend",
+        "tags": [
+          "npm:private"
+        ],
+        "implicitDependencies": []
+      }
+    },
+    "@tiktok-commerce/common": {
+      "name": "@tiktok-commerce/common",
+      "type": "lib",
+      "data": {
+        "root": "libs/common",
+        "targets": {
+          "lint": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "lint"
+            },
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              },
+              "scriptContent": "eslint src/**/*.ts",
+              "runCommand": "bun run lint -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "cache": true
+          },
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "cache": true
+          },
+          "dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "dev"
+            },
+            "metadata": {
+              "scriptContent": "tsc --watch",
+              "runCommand": "bun run dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "test": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test"
+            },
+            "metadata": {
+              "scriptContent": "jest",
+              "runCommand": "bun run test -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "^production",
+              "{workspaceRoot}/jest.preset.js"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "name": "@tiktok-commerce/common",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "dev",
+              "lint",
+              "test",
+              "clean"
+            ]
+          },
+          "description": "Shared common utilities and DTOs for TikTok Commerce Link Hub",
+          "js": {
+            "packageName": "@tiktok-commerce/common",
+            "packageMain": "dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@tiktok-commerce/config": {
+      "name": "@tiktok-commerce/config",
+      "type": "lib",
+      "data": {
+        "root": "libs/config",
+        "targets": {
+          "lint": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "lint"
+            },
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              },
+              "scriptContent": "eslint src/**/*.ts",
+              "runCommand": "bun run lint -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "cache": true
+          },
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "cache": true
+          },
+          "dev": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "dev"
+            },
+            "metadata": {
+              "scriptContent": "tsc --watch",
+              "runCommand": "bun run dev -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "test": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "test"
+            },
+            "metadata": {
+              "scriptContent": "jest",
+              "runCommand": "bun run test -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "inputs": [
+              "default",
+              "^production",
+              "{workspaceRoot}/jest.preset.js"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "name": "@tiktok-commerce/config",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "dev",
+              "lint",
+              "test",
+              "clean"
+            ]
+          },
+          "description": "Centralized configuration management for TikTok Commerce Link Hub",
+          "js": {
+            "packageName": "@tiktok-commerce/config",
+            "packageMain": "dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "nx": {
+      "name": "nx",
+      "type": "app",
+      "data": {
+        "root": ".",
+        "targets": {
+          "lint": {
+            "cache": true,
+            "options": {
+              "cwd": ".",
+              "command": "eslint ./src"
+            },
+            "inputs": [
+              "default",
+              "{workspaceRoot}/.eslintrc.json",
+              "{workspaceRoot}/eslint.config.js"
+            ],
+            "outputs": [
+              "{options.outputFile}"
+            ],
+            "metadata": {
+              "technologies": [
+                "eslint"
+              ],
+              "description": "Runs ESLint on project",
+              "help": {
+                "command": "bun eslint --help",
+                "example": {
+                  "options": {
+                    "max-warnings": 0
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "build": {
+            "options": {
+              "cwd": ".",
+              "command": "vite build"
+            },
+            "cache": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "inputs": [
+              "production",
+              "^production"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Run Vite build",
+              "help": {
+                "command": "bun vite build --help",
+                "example": {
+                  "options": {
+                    "sourcemap": true,
+                    "manifest": "manifest.json"
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "serve": {
+            "options": {
+              "cwd": ".",
+              "command": "vite"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Starts Vite dev server",
+              "help": {
+                "command": "bun vite --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              },
+              "deprecated": "Use devTargetName instead. This option will be removed in Nx 22."
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "dev": {
+            "options": {
+              "cwd": ".",
+              "command": "vite"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Starts Vite dev server",
+              "help": {
+                "command": "bun vite --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "preview": {
+            "dependsOn": [
+              "build"
+            ],
+            "options": {
+              "cwd": ".",
+              "command": "vite preview"
+            },
+            "metadata": {
+              "technologies": [
+                "vite"
+              ],
+              "description": "Locally preview Vite production build",
+              "help": {
+                "command": "bun vite preview --help",
+                "example": {
+                  "options": {
+                    "port": 3000
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "serve-static": {
+            "executor": "@nx/web:file-server",
+            "options": {
+              "buildTarget": "build",
+              "spa": true
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "typecheck": {
+            "cache": true,
+            "inputs": [
+              "production",
+              "^production",
+              {
+                "externalDependencies": [
+                  "typescript"
+                ]
+              }
+            ],
+            "options": {
+              "cwd": ".",
+              "command": "tsc --noEmit -p tsconfig.app.json"
+            },
+            "metadata": {
+              "description": "Runs type-checking for the project.",
+              "technologies": [
+                "typescript"
+              ],
+              "help": {
+                "command": "bun tsc -p tsconfig.app.json --help",
+                "example": {
+                  "options": {
+                    "noEmit": true
+                  }
+                }
+              }
+            },
+            "executor": "nx:run-commands",
+            "configurations": {},
+            "parallelism": true
+          },
+          "build-deps": {
+            "dependsOn": [
+              "^build"
+            ],
+            "configurations": {},
+            "options": {},
+            "parallelism": true,
+            "executor": "nx:noop"
+          },
+          "watch-deps": {
+            "dependsOn": [
+              "build-deps"
+            ],
+            "executor": "nx:run-commands",
+            "options": {
+              "command": "bun nx watch --projects tiktok-commerce-link-hub --includeDependentProjects -- bun nx build-deps tiktok-commerce-link-hub"
+            },
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "projectType": "application",
+        "metadata": {},
+        "name": "nx",
+        "implicitDependencies": [],
+        "tags": []
+      }
+    }
+  },
+  "externalNodes": {},
+  "dependencies": {
+    "undefined": [],
+    "product-service": [],
+    "ingestion-api": [],
+    "frontend": [],
+    "@tiktok-commerce/common": [],
+    "@tiktok-commerce/config": [],
+    "nx": [
+      {
+        "source": "nx",
+        "target": "undefined",
+        "type": "static"
+      },
+      {
+        "source": "nx",
+        "target": "undefined",
+        "type": "dynamic"
+      }
+    ]
+  },
+  "version": "6.0",
+  "errors": [
+    {
+      "stack": " - bun.lockb: Error: Command failed: bun /home/liam/Desktop/tiktok-shop-link-kit/bun.lockb\n/bin/sh: 1: bun: not found\n\n    at genericNodeError (node:internal/errors:984:15)\n    at wrappedFn (node:internal/errors:538:14)\n    at checkExecSyncError (node:child_process:891:11)\n    at execSync (node:child_process:963:15)\n    at exports.createNodes (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/plugins/js/index.js:35:44)\n    at /home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/utils.js:10:33\n    at Array.map (<anonymous>)\n    at createNodesFromFiles (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/utils.js:8:35)\n    at LoadedNxPlugin.createNodes (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/loaded-nx-plugin.js:19:76)\n    at LoadedNxPlugin.createNodes.<computed> (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/loaded-nx-plugin.js:36:34)",
+      "message": "An error occurred while processing files for the nx/js/dependencies-and-lockfile plugin\n.\n  - bun.lockb: Command failed: bun /home/liam/Desktop/tiktok-shop-link-kit/bun.lockb\n/bin/sh: 1: bun: not found\n",
+      "errors": [
+        [
+          "bun.lockb",
+          {
+            "stack": "Error: Command failed: bun /home/liam/Desktop/tiktok-shop-link-kit/bun.lockb\n/bin/sh: 1: bun: not found\n\n    at genericNodeError (node:internal/errors:984:15)\n    at wrappedFn (node:internal/errors:538:14)\n    at checkExecSyncError (node:child_process:891:11)\n    at execSync (node:child_process:963:15)\n    at exports.createNodes (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/plugins/js/index.js:35:44)\n    at /home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/utils.js:10:33\n    at Array.map (<anonymous>)\n    at createNodesFromFiles (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/utils.js:8:35)\n    at LoadedNxPlugin.createNodes (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/loaded-nx-plugin.js:19:76)\n    at LoadedNxPlugin.createNodes.<computed> (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/nx/src/project-graph/plugins/loaded-nx-plugin.js:36:34)",
+            "message": "Command failed: bun /home/liam/Desktop/tiktok-shop-link-kit/bun.lockb\n/bin/sh: 1: bun: not found\n",
+            "status": 127,
+            "signal": null,
+            "output": [
+              null,
+              {
+                "type": "Buffer",
+                "data": []
+              },
+              {
+                "type": "Buffer",
+                "data": [
+                  47,
+                  98,
+                  105,
+                  110,
+                  47,
+                  115,
+                  104,
+                  58,
+                  32,
+                  49,
+                  58,
+                  32,
+                  98,
+                  117,
+                  110,
+                  58,
+                  32,
+                  110,
+                  111,
+                  116,
+                  32,
+                  102,
+                  111,
+                  117,
+                  110,
+                  100,
+                  10
+                ]
+              }
+            ],
+            "pid": 9653,
+            "stdout": {
+              "type": "Buffer",
+              "data": []
+            },
+            "stderr": {
+              "type": "Buffer",
+              "data": [
+                47,
+                98,
+                105,
+                110,
+                47,
+                115,
+                104,
+                58,
+                32,
+                49,
+                58,
+                32,
+                98,
+                117,
+                110,
+                58,
+                32,
+                110,
+                111,
+                116,
+                32,
+                102,
+                111,
+                117,
+                110,
+                100,
+                10
+              ]
+            }
+          }
+        ]
+      ],
+      "partialResults": [
+        [
+          "package-lock.json",
+          {}
+        ]
+      ],
+      "name": "AggregateCreateNodesError"
+    },
+    {
+      "stack": " - .eslintrc.js: ReferenceError: Cannot read config file: /home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js\nError: module is not defined\n    at file:///home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js:1:1\n    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:387:35)\n    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:323:47)\n    at loadESMFromCJS (node:internal/modules/cjs/loader:1371:24)\n    at Module._compile (node:internal/modules/cjs/loader:1511:5)\n    at Module._extensions..js (node:internal/modules/cjs/loader:1572:16)\n    at Module.load (node:internal/modules/cjs/loader:1275:32)\n    at Module._load (node:internal/modules/cjs/loader:1096:12)\n    at Module.require (node:internal/modules/cjs/loader:1298:19)\n    at module.exports [as default] (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/import-fresh/index.js:33:91)",
+      "message": "An error occurred while processing files for the @nx/eslint/plugin plugin\n.\n  - .eslintrc.js: Cannot read config file: /home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js\nError: module is not defined",
+      "errors": [
+        [
+          ".eslintrc.js",
+          {
+            "stack": "ReferenceError: Cannot read config file: /home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js\nError: module is not defined\n    at file:///home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js:1:1\n    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:387:35)\n    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:323:47)\n    at loadESMFromCJS (node:internal/modules/cjs/loader:1371:24)\n    at Module._compile (node:internal/modules/cjs/loader:1511:5)\n    at Module._extensions..js (node:internal/modules/cjs/loader:1572:16)\n    at Module.load (node:internal/modules/cjs/loader:1275:32)\n    at Module._load (node:internal/modules/cjs/loader:1096:12)\n    at Module.require (node:internal/modules/cjs/loader:1298:19)\n    at module.exports [as default] (/home/liam/Desktop/tiktok-shop-link-kit/node_modules/import-fresh/index.js:33:91)",
+            "message": "Cannot read config file: /home/liam/Desktop/tiktok-shop-link-kit/.eslintrc.js\nError: module is not defined"
+          }
+        ]
+      ],
+      "partialResults": [
+        [
+          "eslint.config.js",
+          {
+            "projects": {
+              "apps/ingestion-api": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/ingestion-api"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "apps/product-service": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/product-service"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "libs/common": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "libs/common"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "libs/config": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "libs/config"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "apps/ai-workers/auto-tagger": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/ai-workers/auto-tagger"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "apps/ai-workers/caption-parser": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/ai-workers/caption-parser"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "apps/ai-workers/thumbnail-generator": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/ai-workers/thumbnail-generator"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "apps/frontend": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint .",
+                    "cache": true,
+                    "options": {
+                      "cwd": "apps/frontend"
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{workspaceRoot}/.eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              ".": {
+                "targets": {
+                  "lint": {
+                    "command": "eslint ./src",
+                    "cache": true,
+                    "options": {
+                      "cwd": "."
+                    },
+                    "inputs": [
+                      "default",
+                      "^default",
+                      "{projectRoot}/eslintrc.js",
+                      "{workspaceRoot}/eslint.config.js",
+                      "{workspaceRoot}/tools/eslint-rules/**/*",
+                      {
+                        "externalDependencies": [
+                          "eslint"
+                        ]
+                      }
+                    ],
+                    "outputs": [
+                      "{options.outputFile}"
+                    ],
+                    "metadata": {
+                      "technologies": [
+                        "eslint"
+                      ],
+                      "description": "Runs ESLint on project",
+                      "help": {
+                        "command": "bun eslint --help",
+                        "example": {
+                          "options": {
+                            "max-warnings": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      ],
+      "name": "AggregateCreateNodesError",
+      "pluginIndex": 0
+    },
+    {
+      "projectRoots": [
+        "apps/ai-workers/auto-tagger",
+        "apps/ai-workers/caption-parser",
+        "apps/ai-workers/thumbnail-generator"
+      ],
+      "projects": {
+        "ingestion-api": {
+          "root": "apps/ingestion-api",
+          "targets": {
+            "lint": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "lint"
+              },
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                },
+                "scriptContent": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+                "runCommand": "bun run lint -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "cache": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "scriptContent": "nest build",
+                "runCommand": "bun run build -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "cache": true
+            },
+            "format": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "format"
+              },
+              "metadata": {
+                "scriptContent": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+                "runCommand": "bun run format -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "start": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start"
+              },
+              "metadata": {
+                "scriptContent": "nest start",
+                "runCommand": "bun run start -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "nest start --watch",
+                "runCommand": "bun run dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "start:debug": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start:debug"
+              },
+              "metadata": {
+                "scriptContent": "nest start --debug --watch",
+                "runCommand": "bun run start:debug -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "start:prod": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start:prod"
+              },
+              "metadata": {
+                "scriptContent": "node dist/main",
+                "runCommand": "bun run start:prod -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "jest",
+                "runCommand": "bun run test -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "^production",
+                "{workspaceRoot}/jest.preset.js"
+              ],
+              "cache": true
+            },
+            "test:watch": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:watch"
+              },
+              "metadata": {
+                "scriptContent": "jest --watch",
+                "runCommand": "bun run test:watch -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:cov": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:cov"
+              },
+              "metadata": {
+                "scriptContent": "jest --coverage",
+                "runCommand": "bun run test:cov -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:debug": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:debug"
+              },
+              "metadata": {
+                "scriptContent": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+                "runCommand": "bun run test:debug -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:e2e": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:e2e"
+              },
+              "metadata": {
+                "scriptContent": "jest --config ./test/jest-e2e.json",
+                "runCommand": "bun run test:e2e -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "ingestion-api",
+          "tags": [
+            "npm:private"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build",
+                "format",
+                "start",
+                "dev",
+                "start:debug",
+                "start:prod",
+                "lint",
+                "test",
+                "test:watch",
+                "test:cov",
+                "test:debug",
+                "test:e2e"
+              ]
+            },
+            "description": "TikTok Commerce Link Hub - Ingestion API Service",
+            "js": {
+              "packageName": "ingestion-api",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        },
+        "product-service": {
+          "root": "apps/product-service",
+          "targets": {
+            "lint": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "lint"
+              },
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                },
+                "scriptContent": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+                "runCommand": "bun run lint -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "cache": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "scriptContent": "nest build",
+                "runCommand": "bun run build -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "cache": true
+            },
+            "format": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "format"
+              },
+              "metadata": {
+                "scriptContent": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+                "runCommand": "bun run format -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "start": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start"
+              },
+              "metadata": {
+                "scriptContent": "nest start",
+                "runCommand": "bun run start -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "nest start --watch",
+                "runCommand": "bun run dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "start:debug": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start:debug"
+              },
+              "metadata": {
+                "scriptContent": "nest start --debug --watch",
+                "runCommand": "bun run start:debug -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "start:prod": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start:prod"
+              },
+              "metadata": {
+                "scriptContent": "node dist/main",
+                "runCommand": "bun run start:prod -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "jest",
+                "runCommand": "bun run test -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "^production",
+                "{workspaceRoot}/jest.preset.js"
+              ],
+              "cache": true
+            },
+            "test:watch": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:watch"
+              },
+              "metadata": {
+                "scriptContent": "jest --watch",
+                "runCommand": "bun run test:watch -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:cov": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:cov"
+              },
+              "metadata": {
+                "scriptContent": "jest --coverage",
+                "runCommand": "bun run test:cov -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:debug": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:debug"
+              },
+              "metadata": {
+                "scriptContent": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+                "runCommand": "bun run test:debug -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:e2e": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:e2e"
+              },
+              "metadata": {
+                "scriptContent": "jest --config ./test/jest-e2e.json",
+                "runCommand": "bun run test:e2e -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "product-service",
+          "tags": [
+            "npm:private"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build",
+                "format",
+                "start",
+                "dev",
+                "start:debug",
+                "start:prod",
+                "lint",
+                "test",
+                "test:watch",
+                "test:cov",
+                "test:debug",
+                "test:e2e"
+              ]
+            },
+            "description": "TikTok Commerce Link Hub - Product Service",
+            "js": {
+              "packageName": "product-service",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        },
+        "@tiktok-commerce/common": {
+          "root": "libs/common",
+          "targets": {
+            "lint": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "lint"
+              },
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                },
+                "scriptContent": "eslint src/**/*.ts",
+                "runCommand": "bun run lint -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "cache": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "scriptContent": "tsc",
+                "runCommand": "bun run build -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "cache": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "tsc --watch",
+                "runCommand": "bun run dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "jest",
+                "runCommand": "bun run test -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "^production",
+                "{workspaceRoot}/jest.preset.js"
+              ],
+              "cache": true
+            },
+            "clean": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "clean"
+              },
+              "metadata": {
+                "scriptContent": "rm -rf dist",
+                "runCommand": "bun run clean -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "^nx-release-publish"
+              ],
+              "options": {},
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "@tiktok-commerce/common",
+          "tags": [
+            "npm:public"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build",
+                "dev",
+                "lint",
+                "test",
+                "clean"
+              ]
+            },
+            "description": "Shared common utilities and DTOs for TikTok Commerce Link Hub",
+            "js": {
+              "packageName": "@tiktok-commerce/common",
+              "packageMain": "dist/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        },
+        "@tiktok-commerce/config": {
+          "root": "libs/config",
+          "targets": {
+            "lint": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "lint"
+              },
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                },
+                "scriptContent": "eslint src/**/*.ts",
+                "runCommand": "bun run lint -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "cache": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "scriptContent": "tsc",
+                "runCommand": "bun run build -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "cache": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "scriptContent": "tsc --watch",
+                "runCommand": "bun run dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "jest",
+                "runCommand": "bun run test -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "^production",
+                "{workspaceRoot}/jest.preset.js"
+              ],
+              "cache": true
+            },
+            "clean": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "clean"
+              },
+              "metadata": {
+                "scriptContent": "rm -rf dist",
+                "runCommand": "bun run clean -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "^nx-release-publish"
+              ],
+              "options": {},
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "@tiktok-commerce/config",
+          "tags": [
+            "npm:public"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build",
+                "dev",
+                "lint",
+                "test",
+                "clean"
+              ]
+            },
+            "description": "Centralized configuration management for TikTok Commerce Link Hub",
+            "js": {
+              "packageName": "@tiktok-commerce/config",
+              "packageMain": "dist/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        },
+        "frontend": {
+          "root": "apps/frontend",
+          "targets": {
+            "lint": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "lint"
+              },
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                },
+                "scriptContent": "eslint .",
+                "runCommand": "bun run lint -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "cache": true
+            },
+            "build": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Run Vite build",
+                "help": {
+                  "command": "bun vite build --help",
+                  "example": {
+                    "options": {
+                      "sourcemap": true,
+                      "manifest": "manifest.json"
+                    }
+                  }
+                },
+                "scriptContent": "vite build",
+                "runCommand": "bun run build -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "cache": true
+            },
+            "serve": {
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "vite"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Starts Vite dev server",
+                "help": {
+                  "command": "bun vite --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                },
+                "deprecated": "Use devTargetName instead. This option will be removed in Nx 22."
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "dev"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Starts Vite dev server",
+                "help": {
+                  "command": "bun vite --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                },
+                "scriptContent": "vite",
+                "runCommand": "bun run dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "preview": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "preview"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Locally preview Vite production build",
+                "help": {
+                  "command": "bun vite preview --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                },
+                "scriptContent": "vite preview",
+                "runCommand": "bun run preview -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "executor": "@nx/web:file-server",
+              "options": {
+                "buildTarget": "build",
+                "spa": true
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "typecheck": {
+              "cache": true,
+              "inputs": [
+                "production",
+                "^production",
+                {
+                  "externalDependencies": [
+                    "typescript"
+                  ]
+                }
+              ],
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "tsc --noEmit -p tsconfig.json"
+              },
+              "metadata": {
+                "description": "Runs type-checking for the project.",
+                "technologies": [
+                  "typescript"
+                ],
+                "help": {
+                  "command": "bun tsc -p tsconfig.json --help",
+                  "example": {
+                    "options": {
+                      "noEmit": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": [
+                "^build"
+              ],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "dependsOn": [
+                "build-deps"
+              ],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "bun nx watch --projects frontend --includeDependentProjects -- bun nx build-deps frontend"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build:dev": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build:dev"
+              },
+              "metadata": {
+                "scriptContent": "vite build --mode development",
+                "runCommand": "bun run build:dev -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "type-check": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "type-check"
+              },
+              "metadata": {
+                "scriptContent": "tsc --noEmit",
+                "runCommand": "bun run type-check -- undefined"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "inputs": [
+                "default",
+                "^production"
+              ],
+              "cache": true
+            }
+          },
+          "projectType": "application",
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "dev",
+                "build",
+                "build:dev",
+                "lint",
+                "preview",
+                "type-check"
+              ]
+            },
+            "js": {
+              "packageName": "frontend",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "name": "frontend",
+          "tags": [
+            "npm:private"
+          ],
+          "implicitDependencies": []
+        },
+        "nx": {
+          "root": ".",
+          "targets": {
+            "lint": {
+              "cache": true,
+              "options": {
+                "cwd": ".",
+                "command": "eslint ./src"
+              },
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.eslintrc.json",
+                "{workspaceRoot}/eslint.config.js"
+              ],
+              "outputs": [
+                "{options.outputFile}"
+              ],
+              "metadata": {
+                "technologies": [
+                  "eslint"
+                ],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "bun eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "options": {
+                "cwd": ".",
+                "command": "vite build"
+              },
+              "cache": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "inputs": [
+                "production",
+                "^production"
+              ],
+              "outputs": [
+                "{projectRoot}/dist"
+              ],
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Run Vite build",
+                "help": {
+                  "command": "bun vite build --help",
+                  "example": {
+                    "options": {
+                      "sourcemap": true,
+                      "manifest": "manifest.json"
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve": {
+              "options": {
+                "cwd": ".",
+                "command": "vite"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Starts Vite dev server",
+                "help": {
+                  "command": "bun vite --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                },
+                "deprecated": "Use devTargetName instead. This option will be removed in Nx 22."
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "options": {
+                "cwd": ".",
+                "command": "vite"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Starts Vite dev server",
+                "help": {
+                  "command": "bun vite --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true,
+              "cache": false
+            },
+            "preview": {
+              "dependsOn": [
+                "build"
+              ],
+              "options": {
+                "cwd": ".",
+                "command": "vite preview"
+              },
+              "metadata": {
+                "technologies": [
+                  "vite"
+                ],
+                "description": "Locally preview Vite production build",
+                "help": {
+                  "command": "bun vite preview --help",
+                  "example": {
+                    "options": {
+                      "port": 3000
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "executor": "@nx/web:file-server",
+              "options": {
+                "buildTarget": "build",
+                "spa": true
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "typecheck": {
+              "cache": true,
+              "inputs": [
+                "production",
+                "^production",
+                {
+                  "externalDependencies": [
+                    "typescript"
+                  ]
+                }
+              ],
+              "options": {
+                "cwd": ".",
+                "command": "tsc --noEmit -p tsconfig.app.json"
+              },
+              "metadata": {
+                "description": "Runs type-checking for the project.",
+                "technologies": [
+                  "typescript"
+                ],
+                "help": {
+                  "command": "bun tsc -p tsconfig.app.json --help",
+                  "example": {
+                    "options": {
+                      "noEmit": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": [
+                "^build"
+              ],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "dependsOn": [
+                "build-deps"
+              ],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "bun nx watch --projects tiktok-commerce-link-hub --includeDependentProjects -- bun nx build-deps tiktok-commerce-link-hub"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "projectType": "application",
+          "metadata": {},
+          "name": "nx",
+          "implicitDependencies": []
+        }
+      },
+      "name": "ProjectsWithNoNameError"
+    }
+  ],
+  "computedAt": 1752921928949
+}

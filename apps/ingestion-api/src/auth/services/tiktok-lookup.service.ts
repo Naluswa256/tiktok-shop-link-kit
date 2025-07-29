@@ -45,6 +45,14 @@ export class TikTokLookupService {
   private readonly maxRetries = 3;
   private readonly retryDelay = 1000; // 1 second
 
+  // Cache for background-collected profile data
+  private readonly profileDataCache = new Map<string, {
+    data: TikTokProfileResult;
+    timestamp: number;
+    expiresAt: number;
+  }>();
+  private readonly PROFILE_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
   constructor(private readonly configService: ConfigService) {
     const apifyToken = this.configService.get<string>('APIFY_TOKEN');
     if (!apifyToken) {
@@ -56,16 +64,44 @@ export class TikTokLookupService {
   }
 
   /**
-   * Validates if a TikTok handle exists using only Apify (for testing)
+   * Fast validation for handle existence using Apify (optimized for speed)
+   * Returns as soon as we find any content, then continues collecting profile data in background
    * @param handle TikTok handle without @ symbol
    * @returns Promise<TikTokProfileResult>
    */
   async validateHandle(handle: string): Promise<TikTokProfileResult> {
     const cleanHandle = this.cleanHandle(handle);
-    this.logger.log(`Validating TikTok handle: ${cleanHandle}`);
+    this.logger.log(`Fast Apify validation for TikTok handle: ${cleanHandle}`);
 
     try {
-      // Only use Apify for testing - no fallback
+      // Use optimized Apify validation that returns quickly
+      return await this.validateWithApifyFast(cleanHandle);
+
+    } catch (error) {
+      this.logger.error(`Apify validation failed for TikTok handle ${cleanHandle}:`, error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // For any other errors, assume handle doesn't exist
+      this.logger.warn(`Apify validation error for ${cleanHandle}, assuming handle doesn't exist`);
+      return { exists: false };
+    }
+  }
+
+  /**
+   * Detailed validation using Apify (for when we need full profile info)
+   * This is slower but provides complete profile data
+   * @param handle TikTok handle without @ symbol
+   * @returns Promise<TikTokProfileResult>
+   */
+  async validateHandleDetailed(handle: string): Promise<TikTokProfileResult> {
+    const cleanHandle = this.cleanHandle(handle);
+    this.logger.log(`Detailed validating TikTok handle: ${cleanHandle}`);
+
+    try {
+      // Use Apify for detailed profile information
       return await this.validateWithApify(cleanHandle);
 
     } catch (error) {
@@ -84,7 +120,102 @@ export class TikTokLookupService {
   }
 
   /**
-   * Validates handle using Apify TikTok Profile Scraper
+   * Ultra-fast Apify validation - optimized for minimal scraping
+   * Returns as soon as we confirm the handle exists
+   */
+  private async validateWithApifyFast(handle: string): Promise<TikTokProfileResult> {
+    if (!this.configService.get<string>('APIFY_TOKEN')) {
+      throw new Error('Apify token not configured');
+    }
+
+    // Minimal input for fastest possible validation
+    const input = {
+      profiles: [handle],
+      shouldDownloadCovers: false,
+      shouldDownloadSlideshowImages: false,
+      shouldDownloadSubtitles: false,
+      shouldDownloadVideos: false,
+      resultsPerPage: 1, // Absolute minimum - just 1 post to confirm existence
+      maxProfilesPerQuery: 1, // Only this profile
+    };
+
+    try {
+      this.logger.debug(`Starting ultra-fast Apify validation for handle: ${handle}`);
+
+      // Start the actor run with aggressive timeout
+      const run = await this.apifyClient.actor(this.actorId).call(input, {
+        timeout: 45, // 45 seconds max - balance between speed and reliability
+        memory: 512, // Lower memory for faster startup
+      });
+
+      this.logger.debug(`Apify run completed for ${handle}:`, {
+        runId: run.id,
+        status: run.status,
+        defaultDatasetId: run.defaultDatasetId,
+        duration: run.stats?.runTimeSecs
+      });
+
+      // Check if the run failed
+      if (run.status === 'FAILED') {
+        this.logger.warn(`Apify run failed for handle: ${handle}`, run.statusMessage);
+        return { exists: false };
+      }
+
+      if (!run.defaultDatasetId) {
+        this.logger.warn(`No dataset ID returned for handle: ${handle}`);
+        return { exists: false };
+      }
+
+      // Get results and validate them properly
+      const { items } = await this.apifyClient.dataset(run.defaultDatasetId).listItems();
+
+      this.logger.debug(`Dataset items for ${handle}:`, {
+        count: items?.length || 0,
+        firstItem: items?.[0] ? Object.keys(items[0]) : []
+      });
+
+      if (!items || items.length === 0) {
+        this.logger.debug(`No items found - handle likely doesn't exist: ${handle}`);
+        return { exists: false };
+      }
+
+      // Validate that we actually got valid TikTok data
+      const firstItem = items[0];
+
+      // Check for error indicators
+      if (firstItem.error || firstItem.errorMessage) {
+        this.logger.debug(`Error in Apify response for ${handle}:`, firstItem.error || firstItem.errorMessage);
+        return { exists: false };
+      }
+
+      // Check for valid profile indicators
+      const hasValidProfile = firstItem.authorMeta ||
+                             firstItem.uniqueId ||
+                             firstItem.nickname ||
+                             firstItem.author ||
+                             firstItem.id; // Any valid TikTok content indicator
+
+      if (!hasValidProfile) {
+        this.logger.debug(`No valid profile data found for handle: ${handle}`);
+        return { exists: false };
+      }
+
+      // If we got here, the handle exists and has content
+      this.logger.log(`✅ Handle validation successful: ${handle} (${run.stats?.runTimeSecs || 'unknown'}s)`);
+
+      // Start background collection for detailed profile data
+      this.collectDetailedProfileDataInBackground(handle, run.defaultDatasetId);
+
+      return { exists: true };
+
+    } catch (error) {
+      this.logger.warn(`Apify validation failed for ${handle}:`, (error as Error).message);
+      return { exists: false };
+    }
+  }
+
+  /**
+   * Original detailed Apify validation - used for background collection
    */
   private async validateWithApify(handle: string): Promise<TikTokProfileResult> {
     if (!this.configService.get<string>('APIFY_TOKEN')) {
@@ -188,65 +319,7 @@ export class TikTokLookupService {
     throw lastError;
   }
 
-  /**
-   * Fallback method using TikTok RSS feed to check if profile exists
-   */
-  private async validateWithRssFallback(handle: string): Promise<TikTokProfileResult> {
-    try {
-      const rssUrl = `https://www.tiktok.com/@${handle}/rss`;
-      
-      // Use fetch to check if RSS feed exists
-      const response = await fetch(rssUrl, {
-        method: 'HEAD',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
-
-      if (response.ok) {
-        this.logger.log(`RSS validation successful for handle: ${handle}`);
-        return {
-          exists: true,
-          // RSS method doesn't provide profile photo or other details
-        };
-      }
-
-      return { exists: false };
-
-    } catch (error) {
-      this.logger.warn(`RSS validation failed for ${handle}:`, (error as Error).message);
-      return { exists: false };
-    }
-  }
-
-  /**
-   * Alternative fallback using direct profile page check
-   */
-  private async validateWithDirectCheck(handle: string): Promise<TikTokProfileResult> {
-    try {
-      const profileUrl = `https://www.tiktok.com/@${handle}`;
-      
-      const response = await fetch(profileUrl, {
-        method: 'HEAD',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(10000),
-      });
-
-      // TikTok returns 200 for valid profiles, 404 for invalid ones
-      if (response.ok) {
-        return { exists: true };
-      }
-
-      return { exists: false };
-
-    } catch (error) {
-      this.logger.warn(`Direct check failed for ${handle}:`, (error as Error).message);
-      throw error;
-    }
-  }
+  // Removed unused validation methods - now using only Apify for accurate results
 
   /**
    * Cleans and validates the handle format
@@ -277,6 +350,88 @@ export class TikTokLookupService {
     }
 
     return cleanHandle;
+  }
+
+  /**
+   * Collect detailed profile data in the background using existing dataset
+   * This runs after fast validation to gather profile info without blocking the user
+   */
+  private collectDetailedProfileDataInBackground(handle: string, datasetId: string): void {
+    // Use setTimeout to make this truly async and non-blocking
+    setTimeout(async () => {
+      try {
+        this.logger.debug(`Starting background profile collection for: ${handle} using dataset: ${datasetId}`);
+
+        // Get all items from the dataset for detailed analysis
+        const { items } = await this.apifyClient.dataset(datasetId).listItems();
+
+        if (!items || items.length === 0) {
+          this.logger.debug(`No items found in background collection for: ${handle}`);
+          return;
+        }
+
+        // Process the items to extract profile information
+        let profileData = null;
+        for (const item of items) {
+          if (item.authorMeta) {
+            profileData = item.authorMeta;
+            break;
+          } else if (item.uniqueId || item.nickname || item.name) {
+            profileData = item;
+            break;
+          }
+        }
+
+        if (profileData && !profileData.error) {
+          const detailedResult: TikTokProfileResult = {
+            exists: true,
+            profilePhotoUrl: profileData.avatar || profileData.avatarLarger || profileData.avatarMedium || profileData.avatarThumb,
+            followerCount: profileData.fans || profileData.followerCount || 0,
+            isVerified: profileData.verified || false,
+            displayName: profileData.nickName || profileData.nickname || profileData.name || profileData.uniqueId,
+          };
+
+          // Cache the detailed profile data
+          this.cacheProfileData(handle, detailedResult);
+
+          this.logger.debug(`Background profile collection completed for: ${handle}`, {
+            verified: detailedResult.isVerified,
+            followers: detailedResult.followerCount,
+            displayName: detailedResult.displayName
+          });
+        }
+
+      } catch (error) {
+        // Don't throw errors in background collection - just log them
+        this.logger.warn(`Background profile collection failed for ${handle}:`, (error as Error).message);
+      }
+    }, 100); // Small delay to ensure the main response is sent first
+  }
+
+  /**
+   * Cache profile data collected in background
+   */
+  private cacheProfileData(handle: string, data: TikTokProfileResult): void {
+    const now = Date.now();
+    this.profileDataCache.set(handle, {
+      data,
+      timestamp: now,
+      expiresAt: now + this.PROFILE_CACHE_TIMEOUT,
+    });
+  }
+
+  /**
+   * Get cached profile data if available
+   */
+  getCachedProfileData(handle: string): TikTokProfileResult | null {
+    const cached = this.profileDataCache.get(handle);
+
+    if (!cached || Date.now() > cached.expiresAt) {
+      this.profileDataCache.delete(handle);
+      return null;
+    }
+
+    return cached.data;
   }
 
   /**

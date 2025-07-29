@@ -3,37 +3,28 @@ import { ConfigService } from '@nestjs/config';
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
-  RespondToAuthChallengeCommand,
-  AdminCreateUserCommand,
-  AdminSetUserPasswordCommand,
-  AdminUpdateUserAttributesCommand,
   GlobalSignOutCommand,
-  ChallengeNameType,
+  SignUpCommand,
+  AdminConfirmSignUpCommand,
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
+import * as jwt from 'jsonwebtoken';
+import * as jwksClient from 'jwks-rsa';
+import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { TikTokLookupService } from './tiktok-lookup.service';
 import { UserRepository } from '../../users/repository/user.repository';
 import { ShopService } from '../../shop/services/shop.service';
 import {
   CognitoAuthResult,
-  AuthSession,
   JwtPayload,
   AuthServiceInterface,
   TikTokProfileValidation,
   AuthErrorCode,
+  SignupResponse,
+  SigninResponse,
 } from '../interfaces/auth.interface';
 import { CreateUserInput, SubscriptionStatus } from '../../users/entities/user.entity';
-
-// Session storage for temporary auth sessions (in-memory for now, could be Redis in production)
-interface AuthSessionData {
-  session: string;
-  challengeName: string;
-  handle: string;
-  phoneNumber: string;
-  createdAt: number;
-  expiresAt: number;
-}
 
 // Cache for validated handles to avoid re-validation and save Apify credits
 interface HandleValidationCache {
@@ -42,18 +33,38 @@ interface HandleValidationCache {
   expiresAt: number;
 }
 
+// Cache for validated tokens to improve performance
+interface TokenValidationCache {
+  payload: JwtPayload;
+  timestamp: number;
+  expiresAt: number;
+}
+
+// Rate limiting for failed token validations
+interface TokenValidationAttempt {
+  count: number;
+  firstAttempt: number;
+  lastAttempt: number;
+}
+
 @Injectable()
 export class AuthService implements AuthServiceInterface {
   private readonly logger = new Logger(AuthService.name);
   private readonly cognitoClient: CognitoIdentityProviderClient;
   private readonly userPoolId: string;
   private readonly clientId: string;
+  private readonly clientSecret?: string;
+  private readonly region: string;
+  private readonly jwksClient: jwksClient.JwksClient;
 
-  // In-memory caches for optimization (use Redis in production)
-  private readonly authSessions = new Map<string, AuthSessionData>();
+  // In-memory caches (use Redis in production)
   private readonly handleValidationCache = new Map<string, HandleValidationCache>();
-  private readonly SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+  private readonly tokenValidationCache = new Map<string, TokenValidationCache>();
+  private readonly tokenValidationAttempts = new Map<string, TokenValidationAttempt>();
   private readonly HANDLE_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  private readonly TOKEN_CACHE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
+  private readonly MAX_VALIDATION_ATTEMPTS = 10; // Max attempts per IP/token
+  private readonly RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
 
   constructor(
     private readonly configService: ConfigService,
@@ -62,49 +73,39 @@ export class AuthService implements AuthServiceInterface {
     private readonly userRepository: UserRepository,
     private readonly shopService: ShopService,
   ) {
+    this.region = this.configService.get('AWS_REGION', 'us-east-1');
     this.cognitoClient = new CognitoIdentityProviderClient({
-      region: this.configService.get('AWS_REGION', 'us-east-1'),
+      region: this.region,
     });
-    
+
     this.userPoolId = this.configService.get('COGNITO_USER_POOL_ID');
     this.clientId = this.configService.get('COGNITO_CLIENT_ID');
+    this.clientSecret = this.configService.get('COGNITO_CLIENT_SECRET');
 
     if (!this.userPoolId || !this.clientId) {
-      this.logger.error('Cognito configuration missing');
-      throw new Error('Cognito configuration missing');
+      throw new Error('Cognito configuration is missing');
     }
-  }
 
-  /**
-   * Cache management methods for optimization
-   */
-  private generateSessionKey(handle: string, phoneNumber: string): string {
-    return `${handle}:${phoneNumber}`;
-  }
-
-  private storeAuthSession(handle: string, phoneNumber: string, session: string, challengeName: string): void {
-    const key = this.generateSessionKey(handle, phoneNumber);
-    const now = Date.now();
-    this.authSessions.set(key, {
-      session,
-      challengeName,
-      handle,
-      phoneNumber,
-      createdAt: now,
-      expiresAt: now + this.SESSION_TIMEOUT,
+    // Debug logging for client secret configuration
+    this.logger.log(`Cognito configuration loaded:`, {
+      userPoolId: this.userPoolId,
+      clientId: this.clientId,
+      hasClientSecret: !!this.clientSecret,
+      clientSecretLength: this.clientSecret ? this.clientSecret.length : 0,
     });
-  }
 
-  private getAuthSession(handle: string, phoneNumber: string): AuthSessionData | null {
-    const key = this.generateSessionKey(handle, phoneNumber);
-    const sessionData = this.authSessions.get(key);
+    // Initialize JWKS client for token verification
+    this.jwksClient = jwksClient({
+      jwksUri: `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 600000, // 10 minutes
+    });
 
-    if (!sessionData || Date.now() > sessionData.expiresAt) {
-      this.authSessions.delete(key);
-      return null;
-    }
-
-    return sessionData;
+    // Start periodic cleanup
+    setInterval(() => {
+      this.cleanupExpiredValidations();
+    }, 5 * 60 * 1000); // Every 5 minutes
   }
 
   private cacheHandleValidation(handle: string, result: TikTokProfileValidation): void {
@@ -127,35 +128,90 @@ export class AuthService implements AuthServiceInterface {
     return cached.result;
   }
 
-  private cleanupExpiredSessions(): void {
+  private cacheTokenValidation(token: string, payload: JwtPayload): void {
+    // Create a hash of the token for cache key (don't store full token for security)
+    const tokenHash = this.createTokenHash(token);
     const now = Date.now();
-    let cleanedSessions = 0;
-    let cleanedValidations = 0;
 
-    // Clean expired auth sessions
-    for (const [key, session] of this.authSessions.entries()) {
-      if (now > session.expiresAt) {
-        this.authSessions.delete(key);
-        cleanedSessions++;
-      }
+    // Cache for shorter time than token expiry to ensure freshness
+    const cacheExpiry = Math.min(
+      now + this.TOKEN_CACHE_TIMEOUT,
+      (payload.exp * 1000) - 30000 // 30 seconds before token expires
+    );
+
+    this.tokenValidationCache.set(tokenHash, {
+      payload,
+      timestamp: now,
+      expiresAt: cacheExpiry,
+    });
+  }
+
+  private getCachedTokenValidation(token: string): JwtPayload | null {
+    const tokenHash = this.createTokenHash(token);
+    const cached = this.tokenValidationCache.get(tokenHash);
+
+    if (!cached || Date.now() > cached.expiresAt) {
+      this.tokenValidationCache.delete(tokenHash);
+      return null;
     }
+
+    return cached.payload;
+  }
+
+  private createTokenHash(token: string): string {
+    // Create a simple hash of the token for cache key
+    // In production, consider using a proper hash function
+    return Buffer.from(token).toString('base64').substring(0, 32);
+  }
+
+  /**
+   * Calculate SECRET_HASH for Cognito API calls when client secret is configured
+   * Formula: Base64(HMAC_SHA256("Client Secret Key", "Username" + "Client Id"))
+   */
+  private calculateSecretHash(username: string): string | undefined {
+    if (!this.clientSecret) {
+      this.logger.debug('No client secret configured, skipping SECRET_HASH calculation');
+      return undefined; // No secret hash needed for public clients
+    }
+
+    const message = username + this.clientId;
+    const hmac = crypto.createHmac('sha256', this.clientSecret);
+    hmac.update(message);
+    const secretHash = hmac.digest('base64');
+
+    this.logger.debug(`SECRET_HASH calculated for user: ${username}`, {
+      messageLength: message.length,
+      secretHashLength: secretHash.length,
+      // Don't log the actual values for security
+    });
+
+    return secretHash;
+  }
+
+  private cleanupExpiredValidations(): void {
+    const now = Date.now();
+    let cleanedHandleValidations = 0;
+    let cleanedTokenValidations = 0;
 
     // Clean expired handle validations
     for (const [key, validation] of this.handleValidationCache.entries()) {
       if (now > validation.expiresAt) {
         this.handleValidationCache.delete(key);
-        cleanedValidations++;
+        cleanedHandleValidations++;
       }
     }
 
-    if (cleanedSessions > 0 || cleanedValidations > 0) {
-      this.logger.debug(`Cleaned up ${cleanedSessions} expired sessions and ${cleanedValidations} expired validations`);
+    // Clean expired token validations
+    for (const [key, validation] of this.tokenValidationCache.entries()) {
+      if (now > validation.expiresAt) {
+        this.tokenValidationCache.delete(key);
+        cleanedTokenValidations++;
+      }
     }
-  }
 
-  private clearAuthSession(handle: string, phoneNumber: string): void {
-    const key = this.generateSessionKey(handle, phoneNumber);
-    this.authSessions.delete(key);
+    if (cleanedHandleValidations > 0 || cleanedTokenValidations > 0) {
+      this.logger.debug(`Cleaned up ${cleanedHandleValidations} expired handle validations and ${cleanedTokenValidations} expired token validations`);
+    }
   }
 
   async validateHandle(handle: string): Promise<TikTokProfileValidation> {
@@ -179,8 +235,8 @@ export class AuthService implements AuthServiceInterface {
         return cachedValidation;
       }
 
-      // Validate handle with TikTok (only if not cached)
-      this.logger.log(`Performing fresh validation for handle: ${handle}`);
+      // Validate handle with TikTok (only if not cached) - optimized for speed
+      this.logger.log(`Performing ultra-fast validation for handle: ${handle}`);
       const result = await this.tiktokLookupService.validateHandle(handle);
 
       if (!result.exists) {
@@ -191,11 +247,15 @@ export class AuthService implements AuthServiceInterface {
         );
       }
 
-      // Cache the successful validation
-      this.cacheHandleValidation(handle, result);
-      this.logger.log(`Handle validation successful and cached: ${handle}`);
+      // Try to get detailed profile data if available from background collection
+      const detailedData = this.tiktokLookupService.getCachedProfileData(handle);
+      const finalResult = detailedData || result;
 
-      return result;
+      // Cache the successful validation
+      this.cacheHandleValidation(handle, finalResult);
+      this.logger.log(`Ultra-fast handle validation successful and cached: ${handle}`);
+
+      return finalResult;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -209,9 +269,12 @@ export class AuthService implements AuthServiceInterface {
     }
   }
 
-  async initiateSignup(handle: string, phoneNumber: string): Promise<AuthSession> {
+  /**
+   * Password-based signup - creates user account with handle and password
+   */
+  async signup(handle: string, password: string): Promise<SignupResponse> {
     try {
-      this.logger.log(`Initiating signup for handle: ${handle}, phone: ${phoneNumber}`);
+      this.logger.log(`Starting password-based signup for handle: ${handle}`);
 
       // Validate handle first - this will throw an error if handle doesn't exist on TikTok
       // or if it's already registered in our database
@@ -222,322 +285,281 @@ export class AuthService implements AuthServiceInterface {
         followers: handleValidation.followerCount
       });
 
-      // Check if phone number already exists
-      const existingUserByPhone = await this.userRepository.getUserByPhone(phoneNumber);
-      if (existingUserByPhone) {
-        throw new HttpException(
-          'This phone number is already registered',
-          HttpStatus.CONFLICT,
-          { cause: { errorCode: AuthErrorCode.PHONE_ALREADY_EXISTS } }
-        );
-      }
-
-      // Create user in Cognito with custom attributes
-      // Use handle as username since phone_number is an alias attribute
-      await this.cognitoClient.send(
-        new AdminCreateUserCommand({
-          UserPoolId: this.userPoolId,
-          Username: handle,
-          UserAttributes: [
-            {
-              Name: 'phone_number',
-              Value: phoneNumber,
-            },
-            {
-              Name: 'phone_number_verified',
-              Value: 'false',
-            },
-            {
-              Name: 'custom:tiktok_handle',
-              Value: handle,
-            },
-          ],
-          MessageAction: 'SUPPRESS', // We'll handle OTP ourselves
-          TemporaryPassword: this.generateTemporaryPassword(),
-        })
-      );
-
-      // Initiate custom auth flow for SMS OTP
-      // Use handle as username since that's what we used to create the user
-      const authResult = await this.cognitoClient.send(
-        new InitiateAuthCommand({
-          ClientId: this.clientId,
-          AuthFlow: AuthFlowType.CUSTOM_AUTH,
-          AuthParameters: {
-            USERNAME: handle,
-          },
-        })
-      );
-
-      if (!authResult.Session || !authResult.ChallengeName) {
-        throw new Error('Failed to initiate auth challenge');
-      }
-
-      // Store the session for later use in confirmSignup (optimization)
-      this.storeAuthSession(handle, phoneNumber, authResult.Session, authResult.ChallengeName);
-
-      // Clean up expired sessions periodically
-      this.cleanupExpiredSessions();
-
-      this.logger.log(`Signup OTP sent to: ${phoneNumber} (session stored)`);
-
-      return {
-        session: authResult.Session,
-        challengeName: authResult.ChallengeName,
-        challengeParameters: authResult.ChallengeParameters,
+      // Create user in Cognito using SignUp (standard flow)
+      const signUpParams: any = {
+        ClientId: this.clientId,
+        Username: handle, // Use handle as username
+        Password: password,
+        // Remove UserAttributes to avoid permission issues
+        // The username field will store the handle
       };
-    } catch (error) {
-      this.logger.error(`Signup initiation failed: ${handle}, ${phoneNumber}`, error);
-      throw this.handleCognitoError(error);
-    }
-  }
 
-  async confirmSignup(handle: string, phoneNumber: string, code: string): Promise<CognitoAuthResult> {
-    try {
-      this.logger.log(`Confirming signup for handle: ${handle}, phone: ${phoneNumber}`);
+      // Add SECRET_HASH if client secret is configured
+      const secretHash = this.calculateSecretHash(handle);
+      if (secretHash) {
+        signUpParams.SecretHash = secretHash;
+      }
 
-      // Try to get stored session first (optimization - avoids re-initiating auth)
-      let sessionData = this.getAuthSession(handle, phoneNumber);
-      let authSession: string;
+      const signUpCommand = new SignUpCommand(signUpParams);
 
-      if (sessionData) {
-        this.logger.log(`Using stored session for ${handle}`);
-        authSession = sessionData.session;
-      } else {
-        // Fallback: initiate new auth flow if session not found or expired
-        this.logger.log(`No stored session found, initiating new auth flow for ${handle}`);
-        const authResult = await this.cognitoClient.send(
-          new InitiateAuthCommand({
-            ClientId: this.clientId,
-            AuthFlow: AuthFlowType.CUSTOM_AUTH,
-            AuthParameters: {
-              USERNAME: handle,
-            },
-          })
-        );
+      const signUpResult = await this.cognitoClient.send(signUpCommand);
+      this.logger.log(`Cognito signup successful for handle: ${handle}`, {
+        userSub: signUpResult.UserSub,
+        confirmed: signUpResult.UserConfirmed,
+      });
 
-        if (!authResult.Session) {
-          throw new Error('Failed to get auth session');
+      // Auto-confirm the user since we're not using email verification
+      if (!signUpResult.UserConfirmed) {
+        try {
+          const confirmParams = {
+            UserPoolId: this.userPoolId,
+            Username: handle,
+          };
+
+          const confirmCommand = new AdminConfirmSignUpCommand(confirmParams);
+          await this.cognitoClient.send(confirmCommand);
+          this.logger.log(`User auto-confirmed for handle: ${handle}`);
+        } catch (confirmError) {
+          this.logger.error(`Failed to auto-confirm user ${handle}:`, confirmError);
+          // Don't throw here - the user was created successfully, they just need manual confirmation
+          this.logger.warn(`User ${handle} created but not confirmed - they may need to verify their account`);
         }
-
-        authSession = authResult.Session;
       }
 
-      // Respond to the SMS challenge using the session we obtained
-      const challengeResult = await this.cognitoClient.send(
-        new RespondToAuthChallengeCommand({
-          ClientId: this.clientId,
-          ChallengeName: ChallengeNameType.CUSTOM_CHALLENGE,
-          Session: authSession,
-          ChallengeResponses: {
-            USERNAME: handle,
-            ANSWER: code,
-          },
-        })
-      );
-
-      if (!challengeResult.AuthenticationResult) {
-        throw new Error('Authentication failed');
-      }
-
-      // Mark phone as verified
-      await this.cognitoClient.send(
-        new AdminUpdateUserAttributesCommand({
-          UserPoolId: this.userPoolId,
-          Username: handle,
-          UserAttributes: [
-            {
-              Name: 'phone_number_verified',
-              Value: 'true',
-            },
-          ],
-        })
-      );
-
-      // Get handle validation data for user creation
-      const handleValidation = await this.tiktokLookupService.validateHandle(handle);
-
-      // Create user in our database
-      const userInput: CreateUserInput = {
+      // Create user record in DynamoDB
+      const userData: CreateUserInput = {
+        cognitoUserId: signUpResult.UserSub!,
         handle,
-        phoneNumber,
-        profilePhotoUrl: handleValidation.profilePhotoUrl,
-        displayName: handleValidation.displayName,
-        followerCount: handleValidation.followerCount,
-        isVerified: handleValidation.isVerified,
-        cognitoUserId: this.extractSubFromToken(challengeResult.AuthenticationResult.AccessToken!),
+        subscriptionStatus: SubscriptionStatus.TRIAL,
+        createdAt: new Date().toISOString(),
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
       };
 
-      const user = await this.userRepository.createUser(userInput);
+      const user = await this.userRepository.createUser(userData);
+      this.logger.log(`User created in database:`, { userId: user.userId, handle });
 
-      // Create shop entry in Shops table
+      // Create shop record
       await this.shopService.createShop({
         handle,
-        phone: phoneNumber,
-        subscription_status: 'trial',
         user_id: user.userId,
-        display_name: handleValidation.displayName,
-        profile_photo_url: handleValidation.profilePhotoUrl,
-        follower_count: handleValidation.followerCount,
-        is_verified: handleValidation.isVerified,
+        subscription_status: 'trial',
+        isActive: true,
+        createdAt: new Date().toISOString(),
       });
 
-      // Clear the used session (cleanup)
-      this.clearAuthSession(handle, phoneNumber);
-
-      this.logger.log(`User and shop created successfully: ${user.userId}`);
+      const shopLink = `/shop/${handle}`;
+      this.logger.log(`Shop created successfully for handle: ${handle}`);
 
       return {
-        accessToken: challengeResult.AuthenticationResult.AccessToken!,
-        refreshToken: challengeResult.AuthenticationResult.RefreshToken!,
-        idToken: challengeResult.AuthenticationResult.IdToken!,
-        expiresIn: challengeResult.AuthenticationResult.ExpiresIn!,
-        tokenType: challengeResult.AuthenticationResult.TokenType!,
+        success: true,
+        shopLink,
+        message: 'Account created successfully! Your shop is ready.',
       };
     } catch (error) {
-      this.logger.error(`Signup confirmation failed: ${handle}, ${phoneNumber}`, error);
-      throw this.handleCognitoError(error);
-    }
-  }
+      this.logger.error(`Signup failed for handle: ${handle}`, error);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
 
-  async initiateSignin(phoneNumber: string): Promise<AuthSession> {
-    try {
-      this.logger.log(`Initiating signin for phone: ${phoneNumber}`);
-
-      // Check if user exists in our database
-      const user = await this.userRepository.getUserByPhone(phoneNumber);
-      if (!user) {
+      // Handle Cognito-specific errors
+      if (error.name === 'UsernameExistsException') {
         throw new HttpException(
-          'User not found. Please sign up first.',
-          HttpStatus.NOT_FOUND,
-          { cause: { errorCode: AuthErrorCode.USER_NOT_FOUND } }
+          'This handle is already taken',
+          HttpStatus.CONFLICT,
+          { cause: { errorCode: AuthErrorCode.USERNAME_EXISTS } }
         );
       }
 
-      // Initiate custom auth flow for SMS OTP using the user's handle as username
-      const authResult = await this.cognitoClient.send(
-        new InitiateAuthCommand({
-          ClientId: this.clientId,
-          AuthFlow: AuthFlowType.CUSTOM_AUTH,
-          AuthParameters: {
-            USERNAME: user.handle,
-          },
-        })
+      if (error.name === 'InvalidPasswordException') {
+        throw new HttpException(
+          'Password does not meet requirements',
+          HttpStatus.BAD_REQUEST,
+          { cause: { errorCode: AuthErrorCode.PASSWORD_TOO_WEAK } }
+        );
+      }
+
+      throw new HttpException(
+        'Signup failed. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        { cause: { errorCode: AuthErrorCode.SERVICE_UNAVAILABLE } }
       );
-
-      if (!authResult.Session || !authResult.ChallengeName) {
-        throw new Error('Failed to initiate auth challenge');
-      }
-
-      // Store the session for later use in confirmSignin (optimization)
-      this.storeAuthSession(user.handle, phoneNumber, authResult.Session, authResult.ChallengeName);
-
-      // Clean up expired sessions periodically
-      this.cleanupExpiredSessions();
-
-      this.logger.log(`Signin OTP sent to: ${phoneNumber} (session stored)`);
-
-      return {
-        session: authResult.Session,
-        challengeName: authResult.ChallengeName,
-        challengeParameters: authResult.ChallengeParameters,
-      };
-    } catch (error) {
-      this.logger.error(`Signin initiation failed: ${phoneNumber}`, error);
-      throw this.handleCognitoError(error);
     }
   }
 
-  async confirmSignin(phoneNumber: string, code: string): Promise<CognitoAuthResult> {
+  /**
+   * Password-based signin - authenticates user with handle and password
+   */
+  async signin(handle: string, password: string): Promise<SigninResponse> {
     try {
-      this.logger.log(`Confirming signin for phone: ${phoneNumber}`);
+      this.logger.log(`Starting password-based signin for handle: ${handle}`);
 
-      // Get user to find their handle
-      const user = await this.userRepository.getUserByPhone(phoneNumber);
+      // Authenticate with Cognito
+      const authParameters: any = {
+        USERNAME: handle,
+        PASSWORD: password,
+      };
+
+      // Add SECRET_HASH if client secret is configured
+      const secretHash = this.calculateSecretHash(handle);
+      if (secretHash) {
+        authParameters.SECRET_HASH = secretHash;
+      }
+
+      const authCommand = new InitiateAuthCommand({
+        ClientId: this.clientId,
+        AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
+        AuthParameters: authParameters,
+      });
+
+      const authResult = await this.cognitoClient.send(authCommand);
+      
+      if (!authResult.AuthenticationResult) {
+        throw new HttpException(
+          'Authentication failed',
+          HttpStatus.UNAUTHORIZED,
+          { cause: { errorCode: AuthErrorCode.INVALID_CREDENTIALS } }
+        );
+      }
+
+      const { AccessToken, RefreshToken, IdToken, ExpiresIn } = authResult.AuthenticationResult;
+
+      // Get user from database
+      const user = await this.userRepository.getUserByHandle(handle);
       if (!user) {
         throw new HttpException(
-          'User not found. Please sign up first.',
+          'User not found',
           HttpStatus.NOT_FOUND,
           { cause: { errorCode: AuthErrorCode.USER_NOT_FOUND } }
         );
       }
 
-      // Try to get stored session first (optimization - avoids re-initiating auth)
-      let sessionData = this.getAuthSession(user.handle, phoneNumber);
-      let authSession: string;
+      this.logger.log(`Signin successful for handle: ${handle}`, {
+        userId: user.userId,
+        subscriptionStatus: user.subscriptionStatus,
+      });
 
-      if (sessionData) {
-        this.logger.log(`Using stored session for signin: ${phoneNumber}`);
-        authSession = sessionData.session;
-      } else {
-        // Fallback: initiate new auth flow if session not found or expired
-        this.logger.log(`No stored session found, initiating new auth flow for signin: ${phoneNumber}`);
-        const authResult = await this.cognitoClient.send(
-          new InitiateAuthCommand({
-            ClientId: this.clientId,
-            AuthFlow: AuthFlowType.CUSTOM_AUTH,
-            AuthParameters: {
-              USERNAME: user.handle,
-            },
-          })
+      return {
+        success: true,
+        accessToken: AccessToken!,
+        refreshToken: RefreshToken!,
+        idToken: IdToken!,
+        expiresIn: ExpiresIn!,
+        user: {
+          handle: user.handle,
+          userId: user.userId,
+          subscriptionStatus: user.subscriptionStatus,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Signin failed for handle: ${handle}`, error);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Handle Cognito-specific errors
+      if (error.name === 'NotAuthorizedException' || error.name === 'UserNotFoundException') {
+        throw new HttpException(
+          'Invalid handle or password',
+          HttpStatus.UNAUTHORIZED,
+          { cause: { errorCode: AuthErrorCode.INVALID_CREDENTIALS } }
         );
+      }
 
-        if (!authResult.Session) {
-          throw new Error('Failed to get auth session');
+      if (error.name === 'UserNotConfirmedException') {
+        // Try to auto-confirm the user (for existing users created before auto-confirmation was implemented)
+        try {
+          this.logger.log(`Attempting to auto-confirm unconfirmed user: ${handle}`);
+          const confirmParams = {
+            UserPoolId: this.userPoolId,
+            Username: handle,
+          };
+
+          const confirmCommand = new AdminConfirmSignUpCommand(confirmParams);
+          await this.cognitoClient.send(confirmCommand);
+          this.logger.log(`User auto-confirmed during signin: ${handle}`);
+
+          // Retry the authentication after confirmation
+          const retryAuthCommand = new InitiateAuthCommand({
+            ClientId: this.clientId,
+            AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
+            AuthParameters: {
+              USERNAME: handle,
+              PASSWORD: password,
+              ...(this.calculateSecretHash(handle) && { SECRET_HASH: this.calculateSecretHash(handle) }),
+            },
+          });
+
+          const retryAuthResult = await this.cognitoClient.send(retryAuthCommand);
+
+          if (retryAuthResult.AuthenticationResult) {
+            const { AccessToken, RefreshToken, IdToken, ExpiresIn } = retryAuthResult.AuthenticationResult;
+
+            // Get user from database
+            const user = await this.userRepository.getUserByHandle(handle);
+            if (!user) {
+              throw new HttpException(
+                'User not found in database',
+                HttpStatus.NOT_FOUND,
+                { cause: { errorCode: AuthErrorCode.USER_NOT_FOUND } }
+              );
+            }
+
+            this.logger.log(`Signin successful after auto-confirmation for handle: ${handle}`);
+
+            return {
+              success: true,
+              accessToken: AccessToken!,
+              refreshToken: RefreshToken!,
+              idToken: IdToken!,
+              expiresIn: ExpiresIn!,
+              user: {
+                handle: user.handle,
+                userId: user.userId,
+                subscriptionStatus: user.subscriptionStatus,
+              },
+            };
+          }
+        } catch (confirmError) {
+          this.logger.error(`Failed to auto-confirm user during signin: ${handle}`, confirmError);
         }
 
-        authSession = authResult.Session;
+        throw new HttpException(
+          'Account not confirmed. Please contact support for assistance.',
+          HttpStatus.UNAUTHORIZED,
+          { cause: { errorCode: AuthErrorCode.USER_NOT_FOUND } }
+        );
       }
 
-      // Respond to the SMS challenge using the session we obtained
-      const challengeResult = await this.cognitoClient.send(
-        new RespondToAuthChallengeCommand({
-          ClientId: this.clientId,
-          ChallengeName: ChallengeNameType.CUSTOM_CHALLENGE,
-          Session: authSession,
-          ChallengeResponses: {
-            USERNAME: user.handle,
-            ANSWER: code,
-          },
-        })
+      throw new HttpException(
+        'Signin failed. Please try again.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        { cause: { errorCode: AuthErrorCode.SERVICE_UNAVAILABLE } }
       );
-
-      if (!challengeResult.AuthenticationResult) {
-        throw new Error('Authentication failed');
-      }
-
-      // Update last login time (reuse the user variable from above)
-      await this.userRepository.updateUser(user.userId, {
-        lastLoginAt: new Date().toISOString(),
-      });
-
-      // Clear the used session (cleanup)
-      this.clearAuthSession(user.handle, phoneNumber);
-
-      this.logger.log(`Signin successful for phone: ${phoneNumber}`);
-
-      return {
-        accessToken: challengeResult.AuthenticationResult.AccessToken!,
-        refreshToken: challengeResult.AuthenticationResult.RefreshToken!,
-        idToken: challengeResult.AuthenticationResult.IdToken!,
-        expiresIn: challengeResult.AuthenticationResult.ExpiresIn!,
-        tokenType: challengeResult.AuthenticationResult.TokenType!,
-      };
-    } catch (error) {
-      this.logger.error(`Signin confirmation failed: ${phoneNumber}`, error);
-      throw this.handleCognitoError(error);
     }
   }
 
-  async refreshTokens(refreshToken: string): Promise<CognitoAuthResult> {
+  async refreshTokens(refreshToken: string, username?: string): Promise<CognitoAuthResult> {
     try {
+      const authParameters: any = {
+        REFRESH_TOKEN: refreshToken,
+      };
+
+      // Add SECRET_HASH if client secret is configured
+      // For refresh token flow, we need the username from the original token
+      if (this.clientSecret && username) {
+        const secretHash = this.calculateSecretHash(username);
+        if (secretHash) {
+          authParameters.SECRET_HASH = secretHash;
+        }
+      }
+
       const authResult = await this.cognitoClient.send(
         new InitiateAuthCommand({
           ClientId: this.clientId,
           AuthFlow: AuthFlowType.REFRESH_TOKEN_AUTH,
-          AuthParameters: {
-            REFRESH_TOKEN: refreshToken,
-          },
+          AuthParameters: authParameters,
         })
       );
 
@@ -554,32 +576,143 @@ export class AuthService implements AuthServiceInterface {
       };
     } catch (error) {
       this.logger.error('Token refresh failed', error);
-      throw this.handleCognitoError(error);
+      throw new HttpException(
+        'Token refresh failed',
+        HttpStatus.UNAUTHORIZED,
+        { cause: { errorCode: AuthErrorCode.INVALID_TOKEN } }
+      );
     }
   }
 
   async validateToken(token: string): Promise<JwtPayload> {
     try {
-      // Verify JWT token (Cognito tokens are self-verifying)
-      const decoded = this.jwtService.decode(token) as JwtPayload;
-      
+      // Check cache first to avoid expensive verification
+      const cachedValidation = this.getCachedTokenValidation(token);
+      if (cachedValidation) {
+        this.logger.debug('Using cached token validation');
+        return cachedValidation;
+      }
+
+      // Decode the token header to get the key ID (kid)
+      const decodedHeader = jwt.decode(token, { complete: true });
+
+      if (!decodedHeader || !decodedHeader.header || !decodedHeader.header.kid) {
+        throw new Error('Invalid token: missing key ID');
+      }
+
+      // Get the signing key from Cognito's JWKS
+      const key = await this.getSigningKey(decodedHeader.header.kid);
+
+      // Verify the token using the public key
+      const decoded = jwt.verify(token, key, {
+        algorithms: ['RS256'],
+      }) as any;
+
+      // Validate token structure and claims
       if (!decoded || !decoded.sub) {
-        throw new Error('Invalid token');
+        throw new Error('Invalid token structure');
       }
 
-      // Check if token is expired
-      if (decoded.exp < Math.floor(Date.now() / 1000)) {
-        throw new Error('Token expired');
-      }
+      // Perform additional security validations
+      this.validateTokenClaims(decoded);
 
-      return decoded;
+      const payload: JwtPayload = {
+        sub: decoded.sub,
+        preferred_username: decoded.username || decoded.preferred_username, // Use username as primary source
+        aud: decoded.aud,
+        iss: decoded.iss,
+        exp: decoded.exp,
+        iat: decoded.iat,
+        token_use: decoded.token_use,
+      };
+
+      // Cache the validated token for performance
+      this.cacheTokenValidation(token, payload);
+
+      this.logger.debug('Token validation successful', {
+        sub: decoded.sub,
+        username: decoded.username || decoded.preferred_username,
+        exp: decoded.exp,
+        token_use: decoded.token_use,
+      });
+
+      return payload;
     } catch (error) {
-      this.logger.error('Token validation failed', error);
+      this.logger.error('Token validation failed', {
+        error: error.message,
+        tokenPreview: token.substring(0, 20) + '...',
+      });
+
+      // Handle specific JWT errors
+      if (error.name === 'TokenExpiredError') {
+        throw new HttpException(
+          'Token has expired',
+          HttpStatus.UNAUTHORIZED,
+          { cause: { errorCode: AuthErrorCode.TOKEN_EXPIRED } }
+        );
+      }
+
+      if (error.name === 'JsonWebTokenError') {
+        throw new HttpException(
+          'Invalid token format',
+          HttpStatus.UNAUTHORIZED,
+          { cause: { errorCode: AuthErrorCode.INVALID_TOKEN } }
+        );
+      }
+
       throw new HttpException(
-        'Invalid or expired token',
+        'Token validation failed',
         HttpStatus.UNAUTHORIZED,
         { cause: { errorCode: AuthErrorCode.INVALID_TOKEN } }
       );
+    }
+  }
+
+  /**
+   * Get the signing key from Cognito's JWKS endpoint
+   */
+  private async getSigningKey(kid: string): Promise<string> {
+    try {
+      const key = await this.jwksClient.getSigningKey(kid);
+      return key.getPublicKey();
+    } catch (error) {
+      this.logger.error('Failed to get signing key', {
+        kid,
+        error: error.message,
+      });
+      throw new Error('Failed to get signing key for token verification');
+    }
+  }
+
+  /**
+   * Validate additional token claims for security
+   */
+  private validateTokenClaims(decoded: any): void {
+    // Validate issuer
+    const expectedIssuer = `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}`;
+    if (decoded.iss !== expectedIssuer) {
+      throw new Error(`Invalid issuer: expected ${expectedIssuer}, got ${decoded.iss}`);
+    }
+
+    // Validate audience (client ID)
+    if (decoded.aud !== this.clientId) {
+      throw new Error(`Invalid audience: expected ${this.clientId}, got ${decoded.aud}`);
+    }
+
+    // Validate token use
+    if (decoded.token_use !== 'access') {
+      throw new Error(`Invalid token use: expected 'access', got ${decoded.token_use}`);
+    }
+
+    // Validate expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (!decoded.exp || decoded.exp < now) {
+      throw new Error('Token has expired');
+    }
+
+    // Validate issued at time (not too far in the future)
+    if (decoded.iat && decoded.iat > now + 300) { // 5 minutes tolerance
+      throw new Error('Token issued in the future');
     }
   }
 
@@ -593,64 +726,11 @@ export class AuthService implements AuthServiceInterface {
       this.logger.log('Token revoked successfully');
     } catch (error) {
       this.logger.error('Token revocation failed', error);
-      throw this.handleCognitoError(error);
+      throw new HttpException(
+        'Token revocation failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        { cause: { errorCode: AuthErrorCode.SERVICE_UNAVAILABLE } }
+      );
     }
-  }
-
-  private generateTemporaryPassword(): string {
-    // Generate a secure temporary password
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  }
-
-  private extractSubFromToken(token: string): string {
-    const decoded = this.jwtService.decode(token) as JwtPayload;
-    return decoded.sub;
-  }
-
-  private handleCognitoError(error: any): HttpException {
-    const errorMap: Record<string, { status: number; code: string; message: string }> = {
-      UserNotFoundException: {
-        status: HttpStatus.NOT_FOUND,
-        code: AuthErrorCode.USER_NOT_FOUND,
-        message: 'User not found',
-      },
-      CodeMismatchException: {
-        status: HttpStatus.BAD_REQUEST,
-        code: AuthErrorCode.INVALID_CODE,
-        message: 'Invalid verification code',
-      },
-      ExpiredCodeException: {
-        status: HttpStatus.BAD_REQUEST,
-        code: AuthErrorCode.CODE_EXPIRED,
-        message: 'Verification code has expired',
-      },
-      TooManyRequestsException: {
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        code: AuthErrorCode.TOO_MANY_ATTEMPTS,
-        message: 'Too many attempts. Please try again later',
-      },
-      UsernameExistsException: {
-        status: HttpStatus.CONFLICT,
-        code: AuthErrorCode.PHONE_ALREADY_EXISTS,
-        message: 'Phone number already registered',
-      },
-    };
-
-    const errorInfo = errorMap[error.name] || {
-      status: HttpStatus.INTERNAL_SERVER_ERROR,
-      code: 'COGNITO_ERROR',
-      message: error.message || 'Authentication error',
-    };
-
-    return new HttpException(
-      errorInfo.message,
-      errorInfo.status,
-      { cause: { errorCode: errorInfo.code } }
-    );
   }
 }

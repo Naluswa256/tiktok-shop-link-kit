@@ -1,0 +1,94 @@
+{
+  "cognito_client_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "7pvoh2r1fkbfscsn2m0joumcdg"
+  },
+  "cognito_user_pool_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:cognito-idp:us-east-1:178502901129:userpool/us-east-1_ZFzDWc77j"
+  },
+  "cognito_user_pool_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "cognito-idp.us-east-1.amazonaws.com/us-east-1_ZFzDWc77j"
+  },
+  "cognito_user_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1_ZFzDWc77j"
+  },
+  "deployment_summary": {
+    "sensitive": false,
+    "type": [
+      "object",
+      {
+        "aws_region": "string",
+        "cognito_client_id": "string",
+        "cognito_pool_id": "string",
+        "deployment_time": "string",
+        "environment": "string",
+        "project_name": "string",
+        "shops_table": "string",
+        "users_table": "string"
+      }
+    ],
+    "value": {
+      "aws_region": "us-east-1",
+      "cognito_client_id": "7pvoh2r1fkbfscsn2m0joumcdg",
+      "cognito_pool_id": "us-east-1_ZFzDWc77j",
+      "deployment_time": "2025-07-21T14:55:21Z",
+      "environment": "production",
+      "project_name": "tiktok-commerce",
+      "shops_table": "tiktok-commerce-shops-production",
+      "users_table": "tiktok-commerce-users-production"
+    }
+  },
+  "dynamodb_shops_table_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:dynamodb:us-east-1:178502901129:table/tiktok-commerce-shops-production"
+  },
+  "dynamodb_shops_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "tiktok-commerce-shops-production"
+  },
+  "dynamodb_users_table_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:dynamodb:us-east-1:178502901129:table/tiktok-commerce-users-production"
+  },
+  "dynamodb_users_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "tiktok-commerce-users-production"
+  },
+  "environment_variables": {
+    "sensitive": false,
+    "type": [
+      "object",
+      {
+        "APIFY_ACTOR_ID": "string",
+        "AWS_REGION": "string",
+        "COGNITO_CLIENT_ID": "string",
+        "COGNITO_REGION": "string",
+        "COGNITO_USER_POOL_ID": "string",
+        "DYNAMODB_SHOPS_TABLE": "string",
+        "DYNAMODB_USERS_TABLE": "string",
+        "NODE_ENV": "string"
+      }
+    ],
+    "value": {
+      "APIFY_ACTOR_ID": "clockworks/tiktok-profile-scraper",
+      "AWS_REGION": "us-east-1",
+      "COGNITO_CLIENT_ID": "7pvoh2r1fkbfscsn2m0joumcdg",
+      "COGNITO_REGION": "us-east-1",
+      "COGNITO_USER_POOL_ID": "us-east-1_ZFzDWc77j",
+      "DYNAMODB_SHOPS_TABLE": "tiktok-commerce-shops-production",
+      "DYNAMODB_USERS_TABLE": "tiktok-commerce-users-production",
+      "NODE_ENV": "production"
+    }
+  }
+}

@@ -50,7 +50,7 @@ export function loadConfig(): WorkerConfig {
 function getDefaultModel(provider: string): string {
   switch (provider) {
     case 'openrouter':
-      return 'microsoft/phi-3-mini-4k-instruct'; // Free tier friendly
+      return 'microsoft/phi-3-mini-128k-instruct'; // Free tier friendly
     case 'ollama':
       return 'phi3:mini'; // Lightweight local model
     case 'openai':

@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Shop from "./pages/Shop";
 import ProductCatalog from "./pages/ProductCatalog";
 import SellerDashboard from "./pages/SellerDashboard";
+import SignupSuccess from "./pages/SignupSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup/success" element={<SignupSuccess />} />
             <Route path="/shop/:handle" element={<Shop />} />
             <Route path="/catalog/:handle" element={<ProductCatalog />} />
             <Route path="/dashboard" element={<SellerDashboard />} />

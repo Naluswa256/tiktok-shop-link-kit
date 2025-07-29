@@ -7,31 +7,31 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const mockProducts = [
   {
     id: 1,
-    title: "New Heels Collection",
+    title: "Kampala Fashion Heels",
     price: "55,000",
-    imageUrl: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop",
-    views: 123
+    imageUrl: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop&auto=format&q=80",
+    views: 234
   },
   {
     id: 2,
-    title: "Designer Handbag",
-    price: "85,000",
-    imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200&h=200&fit=crop",
-    views: 89
+    title: "African Print Bag",
+    price: "45,000",
+    imageUrl: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop&auto=format&q=80",
+    views: 189
   },
   {
     id: 3,
-    title: "Summer Dress",
-    price: "45,000",
-    imageUrl: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=200&h=200&fit=crop",
-    views: 156
+    title: "Gomesi Modern Style",
+    price: "120,000",
+    imageUrl: "https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=200&h=200&fit=crop&auto=format&q=80",
+    views: 312
   },
   {
     id: 4,
-    title: "Fashion Accessories",
-    price: "25,000",
-    imageUrl: "https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=200&h=200&fit=crop",
-    views: 67
+    title: "Ugandan Jewelry Set",
+    price: "35,000",
+    imageUrl: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=200&h=200&fit=crop&auto=format&q=80",
+    views: 156
   }
 ];
 

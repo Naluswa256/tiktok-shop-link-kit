@@ -221,19 +221,8 @@ const ProductCatalog = () => {
             <div className="flex items-center gap-sm">
               <PageViewCounter count={totalViews} />
               {!user && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={handleSignIn}
-                  className="gap-2"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </Button>
-              )}
-              {!user && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={handleSignIn}
                   className="gap-2"

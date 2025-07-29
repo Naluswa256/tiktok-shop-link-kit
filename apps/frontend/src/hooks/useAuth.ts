@@ -2,12 +2,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { 
-  authApi, 
-  handleApiError, 
-  ValidateHandleRequest, 
-  SignupRequest, 
+import {
+  authApi,
+  handleApiError,
+  ValidateHandleRequest,
+  SignupRequest,
   VerifySignupRequest,
+  PasswordSignupRequest,
+  PasswordSigninRequest,
   cleanTikTokHandle,
   formatPhoneNumber
 } from '@/lib/api';
@@ -21,12 +23,100 @@ export const useValidateHandle = () => {
       if (!cleanHandle) {
         throw new Error('Please enter a valid TikTok handle');
       }
-      
+
       const request: ValidateHandleRequest = { handle: cleanHandle };
       return authApi.validateHandle(request);
     },
     onError: (error) => {
       handleApiError(error, 'Failed to validate TikTok handle');
+    },
+  });
+};
+
+// Hook for password-based signup
+export const usePasswordSignup = () => {
+  return useMutation({
+    mutationFn: async ({ handle, password }: { handle: string; password: string }) => {
+      const cleanHandle = cleanTikTokHandle(handle);
+
+      if (!cleanHandle) {
+        throw new Error('Please enter a valid TikTok handle');
+      }
+
+      if (!password || password.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+
+      const request: PasswordSignupRequest = {
+        handle: cleanHandle,
+        password
+      };
+      return authApi.passwordSignup(request);
+    },
+    onSuccess: () => {
+      toast.success('Account created successfully! Your shop is ready.');
+      // Don't navigate here - let the calling component handle the success state
+    },
+    onError: (error) => {
+      handleApiError(error, 'Failed to create account');
+    },
+  });
+};
+
+// Hook for password-based signin
+export const usePasswordSignin = () => {
+  const navigate = useNavigate();
+  const { login } = useAuthContext();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ handle, password }: { handle: string; password: string }) => {
+      const cleanHandle = cleanTikTokHandle(handle);
+
+      if (!cleanHandle) {
+        throw new Error('Please enter a valid TikTok handle');
+      }
+
+      if (!password) {
+        throw new Error('Please enter your password');
+      }
+
+      const request: PasswordSigninRequest = {
+        handle: cleanHandle,
+        password
+      };
+      return authApi.passwordSignin(request);
+    },
+    onSuccess: (response) => {
+      // Store auth tokens securely
+      localStorage.setItem('buylink_access_token', response.data.accessToken);
+      localStorage.setItem('buylink_refresh_token', response.data.refreshToken);
+      localStorage.setItem('buylink_id_token', response.data.idToken);
+
+      // Create user object matching AuthContext interface
+      const userData = {
+        id: response.data.user.userId,
+        tiktokHandle: response.data.user.handle,
+        shopHandle: response.data.user.handle, // Same as TikTok handle
+        phoneNumber: '', // Not available in password auth
+        shopLink: `/shop/${response.data.user.handle}`,
+        subscriptionStatus: response.data.user.subscriptionStatus,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Update auth context
+      login(userData, response.data.accessToken);
+
+      // Clear any cached data
+      queryClient.clear();
+
+      toast.success('Welcome back!');
+
+      // Navigate to shop page
+      navigate(`/shop/${response.data.user.handle}`);
+    },
+    onError: (error) => {
+      handleApiError(error, 'Failed to sign in');
     },
   });
 };
@@ -56,7 +146,7 @@ export const useSignup = () => {
       };
       return authApi.signup(request);
     },
-    onSuccess: (response, variables) => {
+    onSuccess: (response) => {
       // Use the masked phone number from the response for better UX
       const maskedPhone = response.data.codeDelivery.destination;
       toast.success(`OTP sent to ${maskedPhone}`);
@@ -94,7 +184,7 @@ export const useVerifySignup = () => {
       };
       return authApi.verifySignup(request);
     },
-    onSuccess: (response, variables) => {
+    onSuccess: (response) => {
       // Store auth tokens securely
       localStorage.setItem('buylink_access_token', response.data.accessToken);
       localStorage.setItem('buylink_refresh_token', response.data.refreshToken);
@@ -202,6 +292,8 @@ export const useAuthFlow = () => {
   const validateHandle = useValidateHandle();
   const signup = useSignup();
   const verifySignup = useVerifySignup();
+  const passwordSignup = usePasswordSignup();
+  const passwordSignin = usePasswordSignin();
   const signout = useSignout();
   const { checkAndPromptSubscription } = useCheckSubscription();
 
@@ -209,17 +301,22 @@ export const useAuthFlow = () => {
     validateHandle,
     signup,
     verifySignup,
+    passwordSignup,
+    passwordSignin,
     signout,
     checkAndPromptSubscription,
 
     // Helper to check if any operation is loading
-    isLoading: validateHandle.isPending || signup.isPending || verifySignup.isPending || signout.isPending,
+    isLoading: validateHandle.isPending || signup.isPending || verifySignup.isPending ||
+               passwordSignup.isPending || passwordSignin.isPending || signout.isPending,
 
     // Helper to reset all mutations
     reset: () => {
       validateHandle.reset();
       signup.reset();
       verifySignup.reset();
+      passwordSignup.reset();
+      passwordSignin.reset();
       signout.reset();
     }
   };

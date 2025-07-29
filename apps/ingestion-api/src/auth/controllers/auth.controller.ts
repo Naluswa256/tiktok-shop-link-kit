@@ -19,16 +19,14 @@ import { AuthService } from '../services/auth.service';
 import { UserRepository } from '../../users/repository/user.repository';
 import { Public } from '../guards/jwt-auth.guard';
 import {
-  ValidateHandleDto,
-  SignupDto,
-  VerifySignupDto,
-  SigninDto,
-  VerifySigninDto,
+  SignupDto as PasswordSignupDto,
+  SigninDto as PasswordSigninDto,
+  SignupResponseDto,
+  SigninResponseDto,
+  ValidateHandleDto as PasswordValidateHandleDto,
+  HandleValidationResponseDto as PasswordHandleValidationResponseDto,
   RefreshTokenDto,
-  HandleValidationResponseDto,
-  AuthResponseDto,
-  OtpResponseDto,
-} from '../dto/auth.dto';
+} from '../dto/password-auth.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
@@ -47,11 +45,11 @@ export class AuthController {
     summary: 'Validate TikTok handle',
     description: 'Validates if a TikTok handle exists and is available for registration',
   })
-  @ApiBody({ type: ValidateHandleDto })
+  @ApiBody({ type: PasswordValidateHandleDto })
   @ApiResponse({
     status: 200,
     description: 'Handle validation result',
-    type: ApiResponseDto<HandleValidationResponseDto>,
+    type: ApiResponseDto<PasswordHandleValidationResponseDto>,
   })
   @ApiResponse({
     status: 404,
@@ -62,8 +60,8 @@ export class AuthController {
     description: 'Handle already registered',
   })
   async validateHandle(
-    @Body() validateHandleDto: ValidateHandleDto,
-  ): Promise<ApiResponseDto<HandleValidationResponseDto>> {
+    @Body() validateHandleDto: PasswordValidateHandleDto,
+  ): Promise<ApiResponseDto<PasswordHandleValidationResponseDto>> {
     const result = await this.authService.validateHandle(validateHandleDto.handle);
     
     return ApiResponseDto.success(
@@ -78,171 +76,69 @@ export class AuthController {
     );
   }
 
-  @Post('signup')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Initiate signup process',
-    description: 'Validates handle and sends OTP to phone number for signup',
-  })
-  @ApiBody({ type: SignupDto })
-  @ApiResponse({
-    status: 200,
-    description: 'OTP sent successfully',
-    type: ApiResponseDto<OtpResponseDto>,
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Handle or phone number already exists',
-  })
-  async signup(@Body() signupDto: SignupDto): Promise<ApiResponseDto<OtpResponseDto>> {
-    const session = await this.authService.initiateSignup(
-      signupDto.handle,
-      signupDto.phoneNumber,
-    );
+  // ===== PASSWORD-BASED AUTHENTICATION ENDPOINTS =====
 
-    return ApiResponseDto.success(
-      {
-        message: 'OTP sent to your phone number',
-        session: session.session,
-        codeDelivery: {
-          deliveryMedium: 'SMS',
-          destination: this.maskPhoneNumber(signupDto.phoneNumber),
-        },
-      },
-      'Signup initiated successfully'
-    );
-  }
-
-  @Post('verify-signup')
+  @Post('password/signup')
   @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Verify signup OTP',
-    description: 'Verifies OTP code and completes user registration',
+    summary: 'Password-based signup',
+    description: 'Creates a new user account with TikTok handle and password',
   })
-  @ApiBody({ type: VerifySignupDto })
+  @ApiBody({ type: PasswordSignupDto })
   @ApiResponse({
     status: 201,
-    description: 'User registered successfully',
-    type: ApiResponseDto<AuthResponseDto>,
+    description: 'Account created successfully',
+    type: ApiResponseDto<SignupResponseDto>,
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid or expired OTP code',
-  })
-  async verifySignup(
-    @Body() verifySignupDto: VerifySignupDto,
-  ): Promise<ApiResponseDto<AuthResponseDto>> {
-    const authResult = await this.authService.confirmSignup(
-      verifySignupDto.handle,
-      verifySignupDto.phoneNumber,
-      verifySignupDto.code,
-    );
-
-    // Get user data
-    const user = await this.userRepository.getUserByPhone(verifySignupDto.phoneNumber);
-    if (!user) {
-      throw new Error('User not found after registration');
-    }
-
-    return ApiResponseDto.success(
-      {
-        accessToken: authResult.accessToken,
-        refreshToken: authResult.refreshToken,
-        expiresIn: authResult.expiresIn,
-        user: {
-          userId: user.userId,
-          handle: user.handle,
-          phoneNumber: user.phoneNumber,
-          shopLink: user.shopLink,
-          subscriptionStatus: user.subscriptionStatus,
-          createdAt: user.createdAt,
-        },
-      },
-      'User registered successfully'
-    );
-  }
-
-  @Post('signin')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Initiate signin process',
-    description: 'Sends OTP to registered phone number for signin',
-  })
-  @ApiBody({ type: SigninDto })
-  @ApiResponse({
-    status: 200,
-    description: 'OTP sent successfully',
-    type: ApiResponseDto<OtpResponseDto>,
+    description: 'Invalid input or password too weak',
   })
   @ApiResponse({
     status: 404,
-    description: 'User not found',
+    description: 'TikTok handle not found',
   })
-  async signin(@Body() signinDto: SigninDto): Promise<ApiResponseDto<OtpResponseDto>> {
-    const session = await this.authService.initiateSignin(signinDto.phoneNumber);
-
+  @ApiResponse({
+    status: 409,
+    description: 'Handle already taken',
+  })
+  async passwordSignup(
+    @Body() signupDto: PasswordSignupDto,
+  ): Promise<ApiResponseDto<SignupResponseDto>> {
+    const result = await this.authService.signup(signupDto.handle, signupDto.password);
+    
     return ApiResponseDto.success(
-      {
-        message: 'OTP sent to your phone number',
-        session: session.session,
-        codeDelivery: {
-          deliveryMedium: 'SMS',
-          destination: this.maskPhoneNumber(signinDto.phoneNumber),
-        },
-      },
-      'Signin initiated successfully'
+      result,
+      'Account created successfully! Your shop is ready.'
     );
   }
 
-  @Post('verify-signin')
+  @Post('password/signin')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Verify signin OTP',
-    description: 'Verifies OTP code and completes user signin',
+    summary: 'Password-based signin',
+    description: 'Authenticates user with TikTok handle and password',
   })
-  @ApiBody({ type: VerifySigninDto })
+  @ApiBody({ type: PasswordSigninDto })
   @ApiResponse({
     status: 200,
-    description: 'User signed in successfully',
-    type: ApiResponseDto<AuthResponseDto>,
+    description: 'Authentication successful',
+    type: ApiResponseDto<SigninResponseDto>,
   })
   @ApiResponse({
-    status: 400,
-    description: 'Invalid or expired OTP code',
+    status: 401,
+    description: 'Invalid credentials',
   })
-  async verifySignin(
-    @Body() verifySigninDto: VerifySigninDto,
-  ): Promise<ApiResponseDto<AuthResponseDto>> {
-    const authResult = await this.authService.confirmSignin(
-      verifySigninDto.phoneNumber,
-      verifySigninDto.code,
-    );
-
-    // Get user data
-    const user = await this.userRepository.getUserByPhone(verifySigninDto.phoneNumber);
-    if (!user) {
-      throw new Error('User not found');
-    }
-
+  async passwordSignin(
+    @Body() signinDto: PasswordSigninDto,
+  ): Promise<ApiResponseDto<SigninResponseDto>> {
+    const result = await this.authService.signin(signinDto.handle, signinDto.password);
+    
     return ApiResponseDto.success(
-      {
-        accessToken: authResult.accessToken,
-        refreshToken: authResult.refreshToken,
-        expiresIn: authResult.expiresIn,
-        user: {
-          userId: user.userId,
-          handle: user.handle,
-          phoneNumber: user.phoneNumber,
-          shopLink: user.shopLink,
-          subscriptionStatus: user.subscriptionStatus,
-          createdAt: user.createdAt,
-        },
-      },
-      'User signed in successfully'
+      result,
+      'Authentication successful'
     );
   }
 
@@ -251,13 +147,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Refreshes access token using refresh token',
+    description: 'Uses refresh token to get a new access token',
   })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({
     status: 200,
     description: 'Token refreshed successfully',
-    type: ApiResponseDto<AuthResponseDto>,
+    type: ApiResponseDto<any>,
   })
   @ApiResponse({
     status: 401,
@@ -265,25 +161,27 @@ export class AuthController {
   })
   async refreshToken(
     @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<ApiResponseDto<Partial<AuthResponseDto>>> {
+  ): Promise<ApiResponseDto<any>> {
     const authResult = await this.authService.refreshTokens(refreshTokenDto.refreshToken);
 
     return ApiResponseDto.success(
       {
         accessToken: authResult.accessToken,
         refreshToken: authResult.refreshToken,
+        idToken: authResult.idToken,
         expiresIn: authResult.expiresIn,
+        tokenType: authResult.tokenType,
       },
       'Token refreshed successfully'
     );
   }
 
-  @Get('profile')
+  @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Get user profile',
-    description: 'Gets the authenticated user profile information',
+    summary: 'Get current user profile',
+    description: 'Returns the authenticated user profile information',
   })
   @ApiResponse({
     status: 200,
@@ -291,30 +189,19 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized',
+    description: 'Unauthorized - invalid or missing token',
   })
-  async getProfile(@Request() req: any): Promise<ApiResponseDto<any>> {
-    const user = await this.userRepository.getUserById(req.user.userId);
+  async getCurrentUser(@Request() req: any): Promise<ApiResponseDto<any>> {
+    const user = req.user;
     
-    if (!user) {
-      throw new Error('User not found');
-    }
-
     return ApiResponseDto.success(
       {
         userId: user.userId,
         handle: user.handle,
         phoneNumber: user.phoneNumber,
-        shopLink: user.shopLink,
         subscriptionStatus: user.subscriptionStatus,
-        profilePhotoUrl: user.profilePhotoUrl,
-        displayName: user.displayName,
-        followerCount: user.followerCount,
-        isVerified: user.isVerified,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt,
       },
-      'Profile retrieved successfully'
+      'User profile retrieved successfully'
     );
   }
 
@@ -324,24 +211,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Sign out user',
-    description: 'Signs out the user and revokes tokens',
+    description: 'Revokes the current access token and signs out the user',
   })
   @ApiResponse({
     status: 200,
     description: 'User signed out successfully',
   })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+  })
   async signout(@Request() req: any): Promise<ApiResponseDto<null>> {
     await this.authService.revokeToken(req.token);
 
     return ApiResponseDto.success(null, 'User signed out successfully');
-  }
-
-  private maskPhoneNumber(phoneNumber: string): string {
-    if (phoneNumber.length <= 4) {
-      return phoneNumber;
-    }
-    const visiblePart = phoneNumber.slice(-4);
-    const maskedPart = '*'.repeat(phoneNumber.length - 4);
-    return maskedPart + visiblePart;
   }
 }

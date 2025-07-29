@@ -44,9 +44,14 @@ export class JwtAuthGuard implements CanActivate {
       // Validate token with Cognito
       const payload = await this.authService.validateToken(token);
       
-      // Get user from database
-      const user = await this.userRepository.getUserByCognitoId(payload.sub);
-      
+      // Get user from database - try by Cognito ID first, then by handle
+      let user = await this.userRepository.getUserByCognitoId(payload.sub);
+
+      // For password-based auth, also try to find by handle if not found by Cognito ID
+      if (!user && payload.preferred_username) {
+        user = await this.userRepository.getUserByHandle(payload.preferred_username);
+      }
+
       if (!user) {
         this.logger.warn(`User not found for Cognito ID: ${payload.sub}`);
         throw new UnauthorizedException('User not found');
@@ -57,7 +62,7 @@ export class JwtAuthGuard implements CanActivate {
         userId: user.userId,
         cognitoUserId: user.cognitoUserId!,
         handle: user.handle,
-        phoneNumber: user.phoneNumber,
+        phoneNumber: user.phoneNumber || '', // Handle optional phone number for password-based auth
         subscriptionStatus: user.subscriptionStatus,
       };
 

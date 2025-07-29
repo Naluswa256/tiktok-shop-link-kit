@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { IngestionController } from './ingestion.controller';
 import { IngestionService as ScheduledIngestionService } from './services/ingestion.service';
 import { ApifyService } from './services/apify.service';
 import { MonitoringService } from './services/monitoring.service';
@@ -11,7 +10,7 @@ import { MonitoringService } from './services/monitoring.service';
       isGlobal: true,
     }),
   ],
-  controllers: [IngestionController],
+  controllers: [],
   providers: [
     ScheduledIngestionService,
     ApifyService,

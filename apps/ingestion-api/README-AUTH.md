@@ -18,9 +18,22 @@ The authentication system implements a passwordless signup/signin flow using:
 - AWS Account with appropriate permissions
 - Apify account for TikTok handle validation
 - Node.js 18+ and npm
-- Docker and Docker Compose (for local development)
+- Terraform 1.0+ installed
+- AWS CLI configured
 
-### AWS Permissions Required
+### AWS IAM Setup for Terraform
+
+#### Step 1: Create IAM User for Terraform
+1. **Go to AWS Console** → IAM → Users → Create User
+2. **User name**: `terraform-tiktok-commerce`
+3. **Access type**: Programmatic access (Access key)
+4. **Don't attach policies yet** - we'll create a custom policy
+
+#### Step 2: Create Custom IAM Policy
+1. **Go to IAM** → Policies → Create Policy
+2. **Policy name**: `TerraformTikTokCommercePolicy`
+3. **Use this JSON policy**:
+
 ```json
 {
   "Version": "2012-10-17",
@@ -30,10 +43,18 @@ The authentication system implements a passwordless signup/signin flow using:
       "Action": [
         "cognito-idp:*",
         "dynamodb:*",
-        "lambda:*",
         "iam:*",
-        "sns:*",
+        "s3:*",
+        "kms:*",
         "logs:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "sts:AssumeRole"
       ],
       "Resource": "*"
     }
@@ -41,32 +62,87 @@ The authentication system implements a passwordless signup/signin flow using:
 }
 ```
 
+#### Step 3: Attach Policy to User
+1. **Go to IAM** → Users → `terraform-tiktok-commerce`
+2. **Permissions** → Add permissions → Attach policies directly
+3. **Select**: `TerraformTikTokCommercePolicy`
+4. **Click**: Add permissions
+
+#### Step 4: Create Access Keys
+1. **Go to IAM** → Users → `terraform-tiktok-commerce`
+2. **Security credentials** → Create access key
+3. **Use case**: Command Line Interface (CLI)
+4. **Download** or copy the Access Key ID and Secret Access Key
+5. **⚠️ Important**: Save these securely - you won't see the secret again
+
+#### Step 5: Configure AWS CLI
+```bash
+# Configure AWS CLI with Terraform user credentials
+aws configure
+# AWS Access Key ID: [Your Terraform user access key]
+# AWS Secret Access Key: [Your Terraform user secret key]
+# Default region name: ap-southeast-3  # Or your preferred region
+# Default output format: json
+
+# Verify configuration works
+aws sts get-caller-identity
+```
+
+#### Step 6: Create S3 Bucket for Terraform State
+```bash
+# Create bucket for Terraform state (replace 'your-unique-bucket-name')
+aws s3 mb s3://your-terraform-state-bucket-name --region ap-southeast-3
+
+# Enable versioning for state file safety
+aws s3api put-bucket-versioning \
+  --bucket your-terraform-state-bucket-name \
+  --versioning-configuration Status=Enabled
+```
+
 ## 🚀 Deployment Instructions
 
 ### 1. Infrastructure Deployment
 
-#### Deploy with Terraform
+#### Option A: Automated Deployment (Recommended)
+```bash
+# Use the automated deployment script
+./scripts/deploy-auth-infrastructure.sh dev
+
+# The script will:
+# 1. Check prerequisites (Terraform, AWS CLI, credentials)
+# 2. Initialize Terraform
+# 3. Create deployment plan
+# 4. Show you what resources will be created
+# 5. Deploy infrastructure after confirmation
+# 6. Generate environment configuration file
+```
+
+#### Option B: Manual Terraform Deployment
 ```bash
 # Navigate to terraform directory
 cd infra/terraform
 
-# Initialize Terraform
-terraform init
+# Initialize Terraform with your S3 backend
+terraform init \
+  -backend-config="bucket=your-terraform-state-bucket-name" \
+  -backend-config="key=tiktok-commerce/dev/terraform.tfstate" \
+  -backend-config="region=ap-southeast-3"
 
 # Create terraform.tfvars file
-cat > terraform.tfvars << EOF
+cat > dev.tfvars << EOF
 project_name = "tiktok-commerce"
 environment = "dev"
-aws_region = "us-east-1"
+aws_region = "ap-southeast-3"
 domain_name = "your-domain.com"
 notification_email = "admin@your-domain.com"
+apify_token = "your-apify-token-here"
 EOF
 
 # Plan deployment
-terraform plan -var-file=terraform.tfvars
+terraform plan -var-file=dev.tfvars
 
 # Deploy infrastructure
-terraform apply -var-file=terraform.tfvars
+terraform apply -var-file=dev.tfvars
 ```
 
 #### Get Terraform Outputs
@@ -77,6 +153,9 @@ terraform output cognito_client_id
 
 # Get DynamoDB table names
 terraform output dynamodb_users_table_name
+
+# Save all outputs to file
+terraform output -json > deployment-outputs.json
 ```
 
 ### 2. Application Configuration
@@ -95,6 +174,7 @@ nano apps/ingestion-api/.env
 # AWS Cognito (from Terraform outputs)
 COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
 COGNITO_CLIENT_ID=your-cognito-client-id
+COGNITO_CLIENT_SECRET=your-cognito-client-secret  # Required if app client has secret
 
 # DynamoDB (from Terraform outputs)
 DYNAMODB_USERS_TABLE=tiktok-users-dev

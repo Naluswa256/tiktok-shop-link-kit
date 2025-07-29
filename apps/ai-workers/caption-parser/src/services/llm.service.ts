@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { LLMResponse, ParsedCaptionData } from '../types';
+import { CategoryService } from './category.service';
 
 // Simple logger implementation to avoid winston dependency issues
 class Logger {
@@ -30,6 +31,7 @@ export class LLMService {
   private apiKey: string | undefined;
   private model: string;
   private baseUrl: string | undefined;
+  private categoryService: CategoryService;
 
   constructor(
     provider: 'openrouter' | 'ollama' | 'openai',
@@ -41,6 +43,7 @@ export class LLMService {
     this.model = model;
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    this.categoryService = new CategoryService();
   }
 
   async parseCaptionWithLLM(caption: string): Promise<ParsedCaptionData> {
@@ -99,7 +102,7 @@ Rules:
 - If price contains "m", multiply by 1000000 (e.g., "1.2m" = 1200000)
 - Extract the main product being sold, ignore promotional words like "new", "hot", "deal"
 - For sizes: include any variant info (clothing sizes, phone storage, car year, house bedrooms, etc.)
-- For tags: focus on product category (electronics, clothing, vehicles, real-estate, food, etc.)
+- For tags: use these main categories: electronics, vehicles, real-estate, clothing, food, beauty, home-garden, services
 - Use null for missing information, empty array [] for tags if unclear
 - No explanations, just JSON
 
@@ -116,36 +119,109 @@ Examples:
       throw new Error('OpenRouter API key not provided');
     }
 
-    const response = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model: this.model, // e.g., 'microsoft/phi-3-mini-4k-instruct'
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 200
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://tiktok-commerce.com',
-          'X-Title': 'TikTok Commerce Caption Parser'
-        },
-        timeout: 30000
-      }
-    );
+    // Retry logic for rate limiting
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-    const content = response.data.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from OpenRouter');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Add delay between requests to avoid rate limiting
+        if (attempt > 1) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 2s, 4s, 8s
+          this.logger.debug(`Retrying OpenRouter request in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await this.sleep(delay);
+        }
+
+        const response = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          {
+            model: this.model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful assistant that extracts product information from TikTok captions and responds only with valid JSON.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 300, // Increased for better JSON responses
+            top_p: 0.9,
+            frequency_penalty: 0,
+            presence_penalty: 0
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': 'https://tiktok-commerce.buylink.ug', // Updated referer
+              'X-Title': 'TikTok Commerce Caption Parser',
+              'User-Agent': 'TikTokCommerce/1.0'
+            },
+            timeout: 45000, // Increased timeout for free tier
+            validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+          }
+        );
+
+        // Handle rate limiting specifically
+        if (response.status === 429) {
+          const retryAfter = response.headers['retry-after'];
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+
+          if (attempt === maxRetries) {
+            throw new Error(`Rate limited after ${maxRetries} attempts. Please try again later.`);
+          }
+
+          this.logger.warn(`Rate limited by OpenRouter. Waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+          await this.sleep(waitTime);
+          continue;
+        }
+
+        // Handle other HTTP errors
+        if (response.status >= 400) {
+          const errorData = response.data;
+          throw new Error(`OpenRouter API error ${response.status}: ${errorData?.error?.message || 'Unknown error'}`);
+        }
+
+        const content = response.data.choices?.[0]?.message?.content;
+        if (!content) {
+          throw new Error('No response content from OpenRouter');
+        }
+
+        this.logger.debug(`OpenRouter response received (attempt ${attempt}): ${content.substring(0, 100)}...`);
+        return JSON.parse(content);
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+
+        // Don't retry on JSON parsing errors or non-retryable errors
+        if (error instanceof SyntaxError ||
+            (error instanceof Error && error.message.includes('JSON'))) {
+          this.logger.warn(`JSON parsing error from OpenRouter: ${error.message}`);
+          break;
+        }
+
+        // Don't retry on authentication errors
+        if (error instanceof Error && error.message.includes('401')) {
+          this.logger.error('OpenRouter authentication failed. Check your API key.');
+          break;
+        }
+
+        this.logger.warn(`OpenRouter attempt ${attempt}/${maxRetries} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+        if (attempt === maxRetries) {
+          break;
+        }
+      }
     }
 
-    return JSON.parse(content);
+    throw lastError || new Error('OpenRouter request failed after all retries');
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private async callOllama(prompt: string): Promise<LLMResponse> {
@@ -314,26 +390,15 @@ Examples:
       });
     }
 
-    // Add category tags based on keywords
-    const categoryKeywords = {
-      'electronics': ['phone', 'iphone', 'samsung', 'laptop', 'computer', 'tv', 'camera', 'headphones'],
-      'vehicles': ['car', 'toyota', 'honda', 'nissan', 'mercedes', 'bmw', 'truck', 'motorcycle'],
-      'real-estate': ['house', 'apartment', 'land', 'plot', 'bedroom', 'rental', 'property'],
-      'clothing': ['shirt', 'dress', 'jeans', 'shoes', 'heels', 'sneakers', 'jacket', 'suit'],
-      'food': ['food', 'rice', 'beans', 'meat', 'fish', 'fruits', 'vegetables', 'restaurant'],
-      'furniture': ['chair', 'table', 'bed', 'sofa', 'cabinet', 'furniture', 'mattress'],
-      'beauty': ['makeup', 'cosmetics', 'perfume', 'skincare', 'hair', 'beauty']
-    };
-
-    const captionLower = caption.toLowerCase();
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      if (keywords.some(keyword => captionLower.includes(keyword))) {
-        if (!tags.includes(category)) {
-          tags.push(category);
-        }
-        break; // Only add one main category
+    // Add category tags using comprehensive CategoryService
+    const categoryTags = this.categoryService.getCategoryTags(caption, 3);
+    categoryTags.forEach(tag => {
+      if (!tags.includes(tag)) {
+        tags.push(tag);
       }
-    }
+    });
+
+    this.logger.debug(`Category classification for "${caption}": ${categoryTags.join(', ')}`);
 
     // Generate a simple title by extracting meaningful words
     let title = 'Product';

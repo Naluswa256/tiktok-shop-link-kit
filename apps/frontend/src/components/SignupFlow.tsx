@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input } from '@/components/tiktok-commerce';
-import { ArrowRight, ArrowLeft, Check, Phone, AtSign, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, AtSign, ExternalLink, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuthFlow } from '@/hooks/useAuth';
 import { cleanTikTokHandle } from '@/lib/api';
 import { toast } from 'sonner';
@@ -22,17 +21,20 @@ export const SignupFlow = () => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [formData, setFormData] = useState({
     tiktokHandle: '',
-    phoneNumber: '',
-    countryCode: '+256', // Default to Uganda
-    otpCode: ''
+    password: '',
+    confirmPassword: ''
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [shopLink, setShopLink] = useState<string>('');
 
   const [handleValidation, setHandleValidation] = useState<ValidationState>({
     isValid: false,
     isValidating: false
   });
 
-  const { validateHandle, signup, verifySignup, checkAndPromptSubscription, isLoading } = useAuthFlow();
+  const { validateHandle, passwordSignup, isLoading } = useAuthFlow();
 
   // Handle TikTok handle validation and proceed to next step
   const handleValidateAndNext = async () => {
@@ -63,13 +65,18 @@ export const SignupFlow = () => {
         });
       }
     } else if (currentStep === 2) {
-      // Send OTP
+      // Create account with password
+      if (formData.password !== formData.confirmPassword) {
+        toast.error('Passwords do not match');
+        return;
+      }
+
       try {
-        await signup.mutateAsync({
+        const response = await passwordSignup.mutateAsync({
           handle: formData.tiktokHandle,
-          phoneNumber: formData.phoneNumber,
-          countryCode: formData.countryCode
+          password: formData.password
         });
+        setShopLink(response.data.shopLink);
         setCurrentStep(3);
       } catch (error) {
         // Error is handled by the hook
@@ -99,25 +106,14 @@ export const SignupFlow = () => {
     }
   };
 
-  // Handle OTP verification
-  const handleVerifyOTP = async () => {
-    try {
-      await verifySignup.mutateAsync({
-        handle: formData.tiktokHandle,
-        phoneNumber: formData.phoneNumber,
-        countryCode: formData.countryCode,
-        code: formData.otpCode
-      });
-
-      // Check if user needs subscription
-      const needsSubscription = checkAndPromptSubscription(cleanTikTokHandle(formData.tiktokHandle));
-
-      if (!needsSubscription) {
-        // Go directly to shop page
-        navigate(`/shop/${cleanTikTokHandle(formData.tiktokHandle)}`);
-      }
-    } catch (error) {
-      // Error is handled by the hook
+  // Handle completing the signup flow
+  const handleCompleteSignup = () => {
+    // Navigate to the actual shop page for owner setup
+    if (shopLink) {
+      navigate(shopLink);
+    } else {
+      const handle = cleanTikTokHandle(formData.tiktokHandle);
+      navigate(`/shop/${handle}`);
     }
   };
 
@@ -126,9 +122,11 @@ export const SignupFlow = () => {
       case 1:
         return formData.tiktokHandle.length > 0 && !handleValidation.isValidating;
       case 2:
-        return formData.phoneNumber.length >= 9;
+        return formData.password.length >= 8 &&
+               formData.confirmPassword.length >= 8 &&
+               formData.password === formData.confirmPassword;
       case 3:
-        return formData.otpCode.length === 6;
+        return true; // Success step
       default:
         return false;
     }
@@ -139,9 +137,9 @@ export const SignupFlow = () => {
       case 1:
         return handleValidation.isValidating ? 'Validating...' : 'Validate Handle';
       case 2:
-        return signup.isPending ? 'Sending...' : 'Send Code';
+        return passwordSignup.isPending ? 'Creating Account...' : 'Create Account';
       case 3:
-        return verifySignup.isPending ? 'Verifying...' : 'Verify & Continue';
+        return 'Visit Your Shop';
       default:
         return 'Continue';
     }
@@ -152,28 +150,32 @@ export const SignupFlow = () => {
       case 1:
         return handleValidation.isValidating;
       case 2:
-        return signup.isPending;
+        return passwordSignup.isPending;
       case 3:
-        return verifySignup.isPending;
+        return false;
       default:
         return false;
     }
   };
 
   const getShopUrl = () => {
+    if (shopLink) {
+      return `${window.location.origin}${shopLink}`;
+    }
     const handle = formData.tiktokHandle.replace('@', '');
-    return `buylink.ug/shop/${handle}`;
+    return `${window.location.origin}/shop/${handle}`;
   };
 
-  const handleCompleteSetup = () => {
-    // Navigate to the subscription page
-    navigate('/subscription');
-  };
+
 
   const handleVisitLink = () => {
     // Open the shop link in a new tab
-    const handle = formData.tiktokHandle.replace('@', '');
-    window.open(`/shop/${handle}`, '_blank');
+    if (shopLink) {
+      window.open(shopLink, '_blank');
+    } else {
+      const handle = formData.tiktokHandle.replace('@', '');
+      window.open(`/shop/${handle}`, '_blank');
+    }
   };
 
   return (
@@ -258,35 +260,63 @@ export const SignupFlow = () => {
               <div className="space-y-md">
                 <div className="text-center space-y-sm">
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                    <Phone className="w-6 h-6 text-primary" />
+                    <Check className="w-6 h-6 text-primary" />
                   </div>
-                  <h3 className="text-lg font-semibold">Enter Your Phone Number</h3>
+                  <h3 className="text-lg font-semibold">Create Your Password</h3>
                   <p className="text-sm text-muted-foreground">
-                    Customers will reach you on WhatsApp to buy
+                    Choose a secure password for your account
                   </p>
                 </div>
 
                 <div className="space-y-sm">
-                  <div className="flex gap-sm">
-                    <select 
-                      className="flex h-12 w-20 rounded-ds-md border border-input bg-background px-2 text-sm"
-                      value={formData.countryCode}
-                      onChange={(e) => handleInputChange('countryCode', e.target.value)}
-                    >
-                      <option value="+256">🇺🇬 +256</option>
-                      <option value="+254">🇰🇪 +254</option>
-                      <option value="+255">🇹🇿 +255</option>
-                    </select>
-                    
+                  <div className="relative">
                     <Input
-                      placeholder="70 123 4567"
-                      value={formData.phoneNumber}
-                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                      className="flex-1"
+                      label="Password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={formData.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      helper="Must be at least 8 characters long"
+                      className="pr-10"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-8 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
+
+                  <div className="relative">
+                    <Input
+                      label="Confirm Password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                      error={formData.confirmPassword && formData.password !== formData.confirmPassword ? 'Passwords do not match' : undefined}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-8 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
-                    We'll never spam you or share your number
+                    Your password will be used to sign in to your account
                   </p>
                 </div>
               </div>
@@ -295,49 +325,40 @@ export const SignupFlow = () => {
             {currentStep === 3 && (
               <div className="space-y-md">
                 <div className="text-center space-y-sm">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                    <Phone className="w-6 h-6 text-primary" />
+                  <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-6 h-6 text-success" />
                   </div>
-                  <h3 className="text-lg font-semibold">Enter Verification Code</h3>
+                  <h3 className="text-lg font-semibold">Account Created Successfully!</h3>
                   <p className="text-sm text-muted-foreground">
-                    We sent a 6-digit code to {formData.countryCode} {formData.phoneNumber}
+                    Your shop is ready and live at:
                   </p>
                 </div>
 
                 <div className="space-y-md">
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={formData.otpCode}
-                      onChange={(value) => handleInputChange('otpCode', value)}
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Your Shop Link</p>
+                      <p className="text-lg font-semibold text-primary break-all">
+                        {getShopUrl()}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      className="text-sm text-primary hover:underline"
-                      onClick={() => {
-                        // Resend OTP
-                        signup.mutate({
-                          handle: formData.tiktokHandle,
-                          phoneNumber: formData.phoneNumber,
-                          countryCode: formData.countryCode
-                        });
-                      }}
-                      disabled={signup.isPending}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleVisitLink}
+                      className="flex-1 gap-2"
                     >
-                      {signup.isPending ? 'Sending...' : 'Resend code'}
-                    </button>
+                      <ExternalLink className="w-4 h-4" />
+                      Visit Shop
+                    </Button>
+                    <Button
+                      onClick={handleCompleteSignup}
+                      className="flex-1"
+                    >
+                      Continue Setup
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -370,38 +391,7 @@ export const SignupFlow = () => {
             </div>
           )}
 
-          {/* OTP Verification Button */}
-          {currentStep === 3 && (
-            <div className="flex justify-between items-center pt-md">
-              <Button
-                variant="ghost"
-                onClick={handleBack}
-                disabled={verifySignup.isPending}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-
-              <Button
-                variant="primary"
-                onClick={handleVerifyOTP}
-                disabled={!isStepValid() || verifySignup.isPending}
-                className="gap-2"
-              >
-                {verifySignup.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {verifySignup.isPending ? 'Verifying...' : 'Verify & Continue'}
-                {!verifySignup.isPending && <ArrowRight className="w-4 h-4" />}
-              </Button>
-            </div>
-          )}
-
-          {/* No Password Note */}
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">
-              🔒 No passwords required - we keep it simple
-            </p>
-          </div>
+          {/* Success step - no navigation needed */}
         </CardContent>
       </Card>
     </div>

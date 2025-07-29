@@ -58,9 +58,9 @@ export interface WorkerConfig {
   snsTopicArn: string;
   awsRegion: string;
   llmProvider: 'openrouter' | 'ollama' | 'openai';
-  llmApiKey?: string;
+  llmApiKey?: string | undefined;
   llmModel: string;
-  ollamaBaseUrl?: string;
+  ollamaBaseUrl?: string | undefined;
   maxRetries: number;
   batchSize: number;
   visibilityTimeout: number;

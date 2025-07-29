@@ -9,12 +9,14 @@
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:captions": "ts-node test-caption-parser.ts",
+    "test:captions:env": "cp .env.test .env && npm run test:captions",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.450.0",
-    "@aws-sdk/client-sqs": "^3.450.0",
+    "@aws-sdk/client-sqs": "^3.854.0",
     "axios": "^1.6.0",
     "dotenv": "^16.3.1"
   },

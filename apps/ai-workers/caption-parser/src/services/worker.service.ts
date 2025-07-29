@@ -199,7 +199,7 @@ export class CaptionParserWorker {
 
       return {
         success: true,
-        messageId: message.MessageId,
+        messageId: message.MessageId || 'unknown',
         videoId: videoEvent.video_id,
         processingTime
       };
@@ -218,7 +218,7 @@ export class CaptionParserWorker {
       // Don't delete message on error - let it retry or go to DLQ
       return {
         success: false,
-        messageId: message.MessageId,
+        messageId: message.MessageId || 'unknown',
         error: errorMessage,
         processingTime
       };

@@ -6,9 +6,12 @@ export interface CognitoConfig {
 
 export interface CognitoUser {
   sub: string;
-  phone_number: string;
-  'custom:tiktok_handle': string;
-  phone_number_verified: boolean;
+  phone_number?: string;
+  preferred_username?: string; // TikTok handle for password-based auth
+  'custom:tiktok_handle'?: string; // Legacy SMS-based auth
+  phone_number_verified?: boolean;
+  email?: string;
+  email_verified?: boolean;
 }
 
 export interface CognitoAuthResult {
@@ -25,16 +28,13 @@ export interface CognitoChallenge {
   challengeParameters?: Record<string, string>;
 }
 
-export interface AuthSession {
-  session: string;
-  challengeName?: string;
-  challengeParameters?: Record<string, string>;
-}
+
 
 export interface JwtPayload {
   sub: string; // Cognito user ID
-  phone_number: string;
-  'custom:tiktok_handle': string;
+  phone_number?: string;
+  preferred_username?: string; // TikTok handle for password-based auth
+  'custom:tiktok_handle'?: string; // Legacy SMS-based auth
   aud: string; // Client ID
   iss: string; // Issuer
   exp: number; // Expiration
@@ -66,12 +66,45 @@ export interface TikTokProfileValidation {
   error?: string;
 }
 
+// New password-based authentication interfaces
+export interface SignupRequest {
+  handle: string;
+  password: string;
+}
+
+export interface SigninRequest {
+  handle: string;
+  password: string;
+}
+
+export interface SignupResponse {
+  success: boolean;
+  shopLink: string;
+  message: string;
+}
+
+export interface SigninResponse {
+  success: boolean;
+  accessToken: string;
+  refreshToken: string;
+  idToken: string;
+  expiresIn: number;
+  user: {
+    handle: string;
+    userId: string;
+    subscriptionStatus: string;
+  };
+}
+
+
+
 export interface AuthServiceInterface {
+  // Password-based authentication methods
+  signup(handle: string, password: string): Promise<SignupResponse>;
+  signin(handle: string, password: string): Promise<SigninResponse>;
+
+  // Common methods
   validateHandle(handle: string): Promise<TikTokProfileValidation>;
-  initiateSignup(handle: string, phoneNumber: string): Promise<AuthSession>;
-  confirmSignup(handle: string, phoneNumber: string, code: string): Promise<CognitoAuthResult>;
-  initiateSignin(phoneNumber: string): Promise<AuthSession>;
-  confirmSignin(phoneNumber: string, code: string): Promise<CognitoAuthResult>;
   refreshTokens(refreshToken: string): Promise<CognitoAuthResult>;
   validateToken(token: string): Promise<JwtPayload>;
   revokeToken(token: string): Promise<void>;
@@ -101,6 +134,13 @@ export enum AuthErrorCode {
   TOKEN_EXPIRED = 'TOKEN_EXPIRED',
   SUBSCRIPTION_REQUIRED = 'SUBSCRIPTION_REQUIRED',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+
+  // Password-based authentication errors
+  INVALID_PASSWORD = 'INVALID_PASSWORD',
+  PASSWORD_TOO_WEAK = 'PASSWORD_TOO_WEAK',
+  PASSWORDS_DO_NOT_MATCH = 'PASSWORDS_DO_NOT_MATCH',
+  USERNAME_EXISTS = 'USERNAME_EXISTS',
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
 }
 
 export interface AuthError {

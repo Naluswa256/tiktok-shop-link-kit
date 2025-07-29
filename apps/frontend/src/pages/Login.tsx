@@ -1,26 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Phone, MessageSquare, ArrowRight, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { getUserFriendlyErrorMessage } from '@/lib/api';
+import { AtSign, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { usePasswordSignin } from '@/hooks/useAuth';
+import { cleanTikTokHandle } from '@/lib/api';
 
 const Login = () => {
-  const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    handle: '',
+    password: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
   const [redirectPath, setRedirectPath] = useState<string>('/dashboard');
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
-  const { signin, verifySignin } = useAuth();
+  const passwordSignin = usePasswordSignin();
 
   // Check for redirect parameter
   useEffect(() => {
@@ -31,247 +30,142 @@ const Login = () => {
     }
   }, [location.search]);
 
-  const handleSendOTP = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      toast({
-        title: "Invalid phone number",
-        description: "Please enter a valid phone number",
-        variant: "destructive"
-      });
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSignin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate inputs
+    if (!formData.handle.trim()) {
+      toast.error('Please enter your TikTok handle');
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      // Format phone number to E.164 format
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+256${phoneNumber}`;
-
-      const response = await signin(formattedPhone);
-
-      if (response.success) {
-        setStep('otp');
-        toast({
-          title: "OTP Sent!",
-          description: response.data.codeDelivery?.destination
-            ? `Verification code sent to ${response.data.codeDelivery.destination}`
-            : `Verification code sent to your phone`,
-        });
-      }
-    } catch (error) {
-      const errorMessage = getUserFriendlyErrorMessage(error, 'signin');
-
-      toast({
-        title: "Sign In Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
-      toast({
-        title: "Invalid OTP",
-        description: "Please enter the 6-digit code",
-        variant: "destructive"
-      });
+    if (!formData.password) {
+      toast.error('Please enter your password');
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      // Format phone number to E.164 format
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+256${phoneNumber}`;
-
-      const response = await verifySignin(formattedPhone, otp);
-
-      if (response.success && response.data) {
-        setStep('success');
-
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
-        });
-
-        // Redirect to appropriate page after success message
-        setTimeout(() => {
-          navigate(redirectPath);
-        }, 2000);
-      }
-    } catch (error) {
-      const errorMessage = getUserFriendlyErrorMessage(error, 'verify');
-
-      toast({
-        title: "Verification Failed",
-        description: errorMessage,
-        variant: "destructive"
+      await passwordSignin.mutateAsync({
+        handle: formData.handle,
+        password: formData.password
       });
 
-      // Clear OTP on error
-      setOtp('');
-    } finally {
-      setIsLoading(false);
+      // Success is handled by the usePasswordSignin hook
+      // It will automatically navigate to the shop page
+
+    } catch (error) {
+      // Error is handled by the usePasswordSignin hook
+      // It will show appropriate error messages
     }
   };
+
+  const isFormValid = formData.handle.trim() && formData.password;
 
   return (
     <Layout
       header={
-        <Header 
-          title="Seller Login"
+        <Header
+          title="Sign In to Your Shop"
         />
       }
     >
       <div className="max-w-md mx-auto space-y-lg">
-        {/* Step Indicator */}
-        <div className="flex justify-center space-x-4">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            step === 'phone' ? 'bg-primary text-white' : 
-            step === 'otp' || step === 'success' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-          }`}>
-            1
-          </div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            step === 'otp' ? 'bg-primary text-white' :
-            step === 'success' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-          }`}>
-            2
-          </div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            step === 'success' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-          }`}>
-            ✓
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-lg space-y-lg">
+            <div className="text-center space-y-sm">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <AtSign className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold">Welcome Back</h2>
+              <p className="text-muted-foreground">
+                Sign in to manage your TikTok shop
+              </p>
+            </div>
 
-        {/* Phone Number Step */}
-        {step === 'phone' && (
-          <Card>
-            <CardContent className="p-lg space-y-lg">
-              <div className="text-center space-y-sm">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                  <Phone className="w-8 h-8 text-primary" />
+            <form onSubmit={handleSignin} className="space-y-md">
+              <div className="space-y-2">
+                <Label htmlFor="handle">TikTok Handle</Label>
+                <div className="relative">
+                  <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="handle"
+                    type="text"
+                    placeholder="your_tiktok_handle"
+                    value={formData.handle}
+                    onChange={(e) => handleInputChange('handle', e.target.value)}
+                    className="pl-10"
+                    autoComplete="username"
+                  />
                 </div>
-                <h2 className="text-xl font-bold">Enter Your Phone Number</h2>
-                <p className="text-muted-foreground">
-                  We'll send you a verification code to confirm it's you
-                </p>
               </div>
 
-              <div className="space-y-md">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                      +256
-                    </span>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="700 123 456"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="pl-16"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="pl-10 pr-10"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
+              </div>
 
-                <Button 
-                  onClick={handleSendOTP}
-                  disabled={isLoading}
-                  className="w-full"
-                  size="lg"
+              <Button
+                type="submit"
+                disabled={!isFormValid || passwordSignin.isPending}
+                className="w-full"
+                size="lg"
+              >
+                {passwordSignin.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center pt-md border-t">
+              <p className="text-sm text-muted-foreground">
+                Don't have an account?{' '}
+                <Link
+                  to="/"
+                  className="text-primary hover:underline font-medium"
                 >
-                  {isLoading ? (
-                    "Sending..."
-                  ) : (
-                    <>
-                      Send Verification Code
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* OTP Verification Step */}
-        {step === 'otp' && (
-          <Card>
-            <CardContent className="p-lg space-y-lg">
-              <div className="text-center space-y-sm">
-                <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto">
-                  <MessageSquare className="w-8 h-8 text-accent" />
-                </div>
-                <h2 className="text-xl font-bold">Enter Verification Code</h2>
-                <p className="text-muted-foreground">
-                  Enter the 6-digit code sent to<br />
-                  <span className="font-medium">+256 {phoneNumber}</span>
-                </p>
-              </div>
-
-              <div className="space-y-lg">
-                <div className="flex justify-center">
-                  <InputOTP
-                    value={otp}
-                    onChange={setOtp}
-                    maxLength={6}
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-
-                <div className="space-y-sm">
-                  <Button 
-                    onClick={handleVerifyOTP}
-                    disabled={isLoading || otp.length !== 6}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isLoading ? "Verifying..." : "Verify & Login"}
-                  </Button>
-
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => setStep('phone')}
-                    className="w-full"
-                  >
-                    Change Phone Number
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Success Step */}
-        {step === 'success' && (
-          <Card>
-            <CardContent className="p-lg space-y-lg text-center">
-              <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle className="w-10 h-10 text-success" />
-              </div>
-              <div className="space-y-sm">
-                <h2 className="text-xl font-bold text-success">Login Successful!</h2>
-                <p className="text-muted-foreground">
-                  Redirecting you to your dashboard...
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  Create your shop
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Help Text */}
         <div className="text-center text-sm text-muted-foreground">

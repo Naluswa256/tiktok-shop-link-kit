@@ -3,7 +3,7 @@
  */
 export interface ShopLinkGeneratedEvent {
   handle: string;
-  phone: string;
+  phone?: string; // Optional for password-based auth
   shop_link: string;
   subscription_status: 'trial' | 'paid';
   created_at: string;
@@ -11,7 +11,7 @@ export interface ShopLinkGeneratedEvent {
 
 export interface Shop {
   handle: string;
-  phone: string;
+  phone?: string; // Optional for password-based auth
   shop_link: string;
   subscription_status: 'trial' | 'paid';
   created_at: string;
@@ -25,13 +25,16 @@ export interface Shop {
 
 export interface CreateShopInput {
   handle: string;
-  phone: string;
+  phone?: string; // Optional for password-based auth
   subscription_status?: 'trial' | 'paid';
+  userId?: string; // Support both userId and user_id
   user_id?: string;
   display_name?: string;
   profile_photo_url?: string;
   follower_count?: number;
   is_verified?: boolean;
+  isActive?: boolean; // Add active status
+  createdAt?: string; // Add created at
 }
 
 export interface ShopServiceInterface {

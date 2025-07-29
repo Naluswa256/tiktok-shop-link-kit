@@ -110,11 +110,6 @@ output "dynamodb_shops_table_arn" {
 }
 
 # Analytics DynamoDB Table Outputs
-output "dynamodb_analytics_table_name" {
-  description = "Name of the DynamoDB analytics table"
-  value       = module.dynamodb_analytics.table_name
-}
-
 output "dynamodb_analytics_table_arn" {
   description = "ARN of the DynamoDB analytics table"
   value       = module.dynamodb_analytics.table_arn

@@ -176,6 +176,13 @@ if [ -z "$COGNITO_CLIENT_ID" ]; then
     exit 1
 fi
 
+# Note: COGNITO_CLIENT_SECRET is optional for public clients
+if [ -n "$COGNITO_CLIENT_SECRET" ]; then
+    echo "✓ COGNITO_CLIENT_SECRET configured (confidential client)"
+else
+    echo "ℹ COGNITO_CLIENT_SECRET not set (public client)"
+fi
+
 if [ -z "$JWT_SECRET" ]; then
     print_error "JWT_SECRET not loaded from .env.production"
     exit 1

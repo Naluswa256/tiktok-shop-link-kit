@@ -224,8 +224,9 @@ export class S3Service {
       return response.Metadata;
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Failed to get thumbnail metadata', {
-        error: error.message,
+        error: errorMessage,
         s3Key
       });
       return undefined;

@@ -9,9 +9,13 @@
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:local": "node test-local-thumbnails.js",
+    "test:cli": "node generate-thumbnails-cli.js --file example-urls.txt",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist",
-    "install-deps": "npm install && python3 -m pip install -r requirements.txt"
+    "install-deps": "npm install && ./setup-python.sh",
+    "yolo:start": "./venv/bin/python python/yolo_service.py",
+    "setup": "npm install && ./setup-python.sh && npm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.450.0",

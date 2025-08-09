@@ -28,9 +28,9 @@ export function loadConfig(): WorkerConfig {
     visibilityTimeout: parseInt(process.env.VISIBILITY_TIMEOUT || '900'), // 15 minutes for video processing
     waitTimeSeconds: parseInt(process.env.WAIT_TIME_SECONDS || '20'),
 
-    // Video Processing Settings
-    maxVideoSizeMB: parseInt(process.env.MAX_VIDEO_SIZE_MB || '50'),
-    maxVideoDurationSeconds: parseInt(process.env.MAX_VIDEO_DURATION_SECONDS || '60'),
+    // Video Processing Settings (Updated for TikTok 2025 limits)
+    maxVideoSizeMB: parseInt(process.env.MAX_VIDEO_SIZE_MB || '300'), // TikTok iOS limit: 287.6MB, Web: 1GB
+    maxVideoDurationSeconds: parseInt(process.env.MAX_VIDEO_DURATION_SECONDS || '3600'), // TikTok max: 60 minutes
     frameExtractionInterval: parseInt(process.env.FRAME_EXTRACTION_INTERVAL || '2'), // Every 2 seconds
     maxFramesToAnalyze: parseInt(process.env.MAX_FRAMES_TO_ANALYZE || '15'),
     thumbnailsToGenerate: parseInt(process.env.THUMBNAILS_TO_GENERATE || '5'), // Generate 5 thumbnails
@@ -45,10 +45,10 @@ export function loadConfig(): WorkerConfig {
     minBrightnessScore: parseFloat(process.env.MIN_BRIGHTNESS_SCORE || '0.3'),
     maxBlurScore: parseFloat(process.env.MAX_BLUR_SCORE || '0.7'),
 
-    // Output Settings
-    thumbnailWidth: parseInt(process.env.THUMBNAIL_WIDTH || '400'),
-    thumbnailHeight: parseInt(process.env.THUMBNAIL_HEIGHT || '400'),
-    thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || '85')
+    // Output Settings (Updated for better TikTok video preservation)
+    thumbnailWidth: parseInt(process.env.THUMBNAIL_WIDTH || '600'), // 3:4 aspect ratio preserves TikTok content better
+    thumbnailHeight: parseInt(process.env.THUMBNAIL_HEIGHT || '800'), // Maintains vertical orientation
+    thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || '90') // Higher quality for better detail
   };
 
   return config;
@@ -68,20 +68,20 @@ export function validateConfig(config: WorkerConfig): void {
     throw new Error('visibilityTimeout must be between 300 and 43200 seconds');
   }
 
-  if (config.maxVideoSizeMB < 1 || config.maxVideoSizeMB > 100) {
-    throw new Error('maxVideoSizeMB must be between 1 and 100');
+  if (config.maxVideoSizeMB < 1 || config.maxVideoSizeMB > 1000) {
+    throw new Error('maxVideoSizeMB must be between 1 and 1000 (TikTok web limit: 1GB)');
   }
 
-  if (config.maxVideoDurationSeconds < 5 || config.maxVideoDurationSeconds > 300) {
-    throw new Error('maxVideoDurationSeconds must be between 5 and 300');
+  if (config.maxVideoDurationSeconds < 1 || config.maxVideoDurationSeconds > 3600) {
+    throw new Error('maxVideoDurationSeconds must be between 1 and 3600 seconds (TikTok max: 60 minutes)');
   }
 
-  if (config.thumbnailWidth < 100 || config.thumbnailWidth > 1000) {
-    throw new Error('thumbnailWidth must be between 100 and 1000');
+  if (config.thumbnailWidth < 100 || config.thumbnailWidth > 2000) {
+    throw new Error('thumbnailWidth must be between 100 and 2000');
   }
 
-  if (config.thumbnailHeight < 100 || config.thumbnailHeight > 1000) {
-    throw new Error('thumbnailHeight must be between 100 and 1000');
+  if (config.thumbnailHeight < 100 || config.thumbnailHeight > 2000) {
+    throw new Error('thumbnailHeight must be between 100 and 2000');
   }
 
   if (config.thumbnailQuality < 50 || config.thumbnailQuality > 100) {

@@ -48,9 +48,9 @@ async function testMultipleThumbnails() {
       visibilityTimeout: 900,
       waitTimeSeconds: 20,
       
-      // Video processing settings
-      maxVideoSizeMB: 50,
-      maxVideoDurationSeconds: 60,
+      // Video processing settings (Updated for TikTok 2025 limits)
+      maxVideoSizeMB: 300, // TikTok iOS limit: 287.6MB, Web: 1GB
+      maxVideoDurationSeconds: 3600, // TikTok max: 60 minutes
       frameExtractionInterval: 2,
       maxFramesToAnalyze: 15,
       thumbnailsToGenerate: 5, // Test with 5 thumbnails

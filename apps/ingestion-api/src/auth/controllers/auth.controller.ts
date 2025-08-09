@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Request,
+  HttpException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -225,5 +226,90 @@ export class AuthController {
     await this.authService.revokeToken(req.token);
 
     return ApiResponseDto.success(null, 'User signed out successfully');
+  }
+
+  @Get('subscription-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get subscription status',
+    description: 'Retrieve current subscription status and expiry information',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Subscription status retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+  })
+  async getSubscriptionStatus(@Request() req: any): Promise<ApiResponseDto<any>> {
+    const user = req.user;
+
+    // Get fresh user data
+    const currentUser = await this.userRepository.getUserById(user.userId);
+    if (!currentUser) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Calculate days left
+    let daysLeft = null;
+    if (currentUser.trialEndDate || currentUser.subscriptionEndDate) {
+      const expiryDate = new Date(currentUser.trialEndDate || currentUser.subscriptionEndDate);
+      const now = new Date();
+      const diffMs = expiryDate.getTime() - now.getTime();
+      daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    return ApiResponseDto.success(
+      {
+        status: currentUser.subscriptionStatus,
+        expiresAt: currentUser.trialEndDate || currentUser.subscriptionEndDate,
+        daysLeft,
+      },
+      'Subscription status retrieved successfully'
+    );
+  }
+
+  @Post('subscribe')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Subscribe to premium plan',
+    description: 'Initiate subscription to premium plan (UGX 10,000/month)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Subscription activated successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+  })
+  async subscribe(@Request() req: any): Promise<ApiResponseDto<any>> {
+    const user = req.user;
+
+    // For now, we'll simulate successful payment and activate subscription
+    // In production, this would integrate with a payment processor
+
+    const subscriptionEndDate = new Date();
+    subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1); // 1 month from now
+
+    await this.userRepository.updateUser(user.userId, {
+      subscriptionStatus: 'active' as any,
+      subscriptionEndDate: subscriptionEndDate.toISOString(),
+      trialEndDate: null, // Clear trial end date
+    });
+
+    return ApiResponseDto.success(
+      {
+        status: 'paid',
+        expiresAt: subscriptionEndDate.toISOString(),
+        daysLeft: 30,
+      },
+      'Subscription activated successfully'
+    );
   }
 }

@@ -82,7 +82,8 @@ export class ThumbnailGeneratorWorker {
         await this.sleep(2000);
         
       } catch (error) {
-        this.logger.error('Error in main worker loop', { error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error('Error in main worker loop', { error: errorMessage });
         await this.sleep(10000); // Longer pause on error
       }
     }
@@ -125,15 +126,17 @@ export class ThumbnailGeneratorWorker {
         try {
           await this.processMessage(message);
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           this.logger.error('Failed to process message', {
             messageId: message.MessageId,
-            error: error.message
+            error: errorMessage
           });
         }
       }
       
     } catch (error) {
-      this.logger.error('Failed to poll SQS messages', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Failed to poll SQS messages', { error: errorMessage });
       throw error;
     }
   }
@@ -312,9 +315,10 @@ export class ThumbnailGeneratorWorker {
       this.errorCount++;
       const processingTime = Date.now() - startTime;
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Failed to process message', {
         messageId: message.MessageId,
-        error: error.message,
+        error: errorMessage,
         processingTime: `${processingTime}ms`
       });
 
@@ -322,7 +326,7 @@ export class ThumbnailGeneratorWorker {
       return {
         success: false,
         messageId: message.MessageId,
-        error: error.message,
+        error: errorMessage,
         processingTime
       };
     }
@@ -364,7 +368,8 @@ export class ThumbnailGeneratorWorker {
         topicArn: this.config.snsTopicArn
       });
     } catch (error) {
-      this.logger.error('Failed to publish to SNS', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Failed to publish to SNS', { error: errorMessage });
       throw error;
     }
   }
@@ -379,9 +384,10 @@ export class ThumbnailGeneratorWorker {
       await this.sqsClient.send(command);
       this.logger.debug('Deleted message from SQS', { messageId: message.MessageId });
     } catch (error) {
-      this.logger.error('Failed to delete message from SQS', { 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Failed to delete message from SQS', {
         messageId: message.MessageId,
-        error: error.message 
+        error: errorMessage
       });
       throw error;
     }

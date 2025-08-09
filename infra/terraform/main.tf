@@ -373,19 +373,7 @@ module "sqs_thumbnail_generation" {
   tags = local.common_tags
 }
 
-module "sqs_auto_tagging" {
-  source = "./modules/sqs_queue"
-  
-  queue_name = "${local.name_prefix}-auto-tagging"
-  
-  visibility_timeout_seconds = 180
-  message_retention_seconds  = 1209600 # 14 days
-  
-  dead_letter_queue_enabled = true
-  max_receive_count        = 3
-  
-  tags = local.common_tags
-}
+
 
 # SNS to SQS Subscriptions for fan-out from new-video-posted topic
 resource "aws_sns_topic_subscription" "caption_analysis" {
@@ -400,11 +388,7 @@ resource "aws_sns_topic_subscription" "thumbnail_generation" {
   endpoint  = module.sqs_thumbnail_generation.queue_arn
 }
 
-resource "aws_sns_topic_subscription" "auto_tagging" {
-  topic_arn = module.sns_new_video_posted.topic_arn
-  protocol  = "sqs"
-  endpoint  = module.sqs_auto_tagging.queue_arn
-}
+
 
 # SQS Queue Policies to allow SNS to send messages
 resource "aws_sqs_queue_policy" "caption_analysis_policy" {
@@ -453,28 +437,7 @@ resource "aws_sqs_queue_policy" "thumbnail_generation_policy" {
   })
 }
 
-resource "aws_sqs_queue_policy" "auto_tagging_policy" {
-  queue_url = module.sqs_auto_tagging.queue_url
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "sns.amazonaws.com"
-        }
-        Action   = "sqs:SendMessage"
-        Resource = module.sqs_auto_tagging.queue_arn
-        Condition = {
-          ArnEquals = {
-            "aws:SourceArn" = module.sns_new_video_posted.topic_arn
-          }
-        }
-      }
-    ]
-  })
-}
 
 # Scheduled Ingestion Lambda
 resource "aws_lambda_function" "scheduled_ingestion" {
@@ -707,7 +670,7 @@ module "ingestion_api" {
     SNS_TOPIC_ARN = module.sns_processing.topic_arn
     SQS_CAPTION_ANALYSIS_QUEUE = module.sqs_caption_analysis.queue_url
     SQS_THUMBNAIL_GENERATION_QUEUE = module.sqs_thumbnail_generation.queue_url
-    SQS_AUTO_TAGGING_QUEUE = module.sqs_auto_tagging.queue_url
+
     
     # AWS
     AWS_REGION = local.region

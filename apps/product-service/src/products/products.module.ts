@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ProductsController } from './products.controller';
-import { ProductsService } from './products.service';
+import { DynamoDBService } from '../database/dynamodb.service';
+import { WebSocketGateway } from '../websocket/websocket.gateway';
 
 @Module({
   controllers: [ProductsController],
-  providers: [ProductsService],
-  exports: [ProductsService],
+  providers: [DynamoDBService, WebSocketGateway],
+  exports: [DynamoDBService],
 })
 export class ProductsModule {}

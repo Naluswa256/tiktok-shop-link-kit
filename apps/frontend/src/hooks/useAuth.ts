@@ -14,6 +14,7 @@ import {
   formatPhoneNumber
 } from '@/lib/api';
 import { useAuth as useAuthContext } from '@/contexts/AuthContext';
+import { useNetworkAwareActions } from '@/components/NetworkStatusIndicator';
 
 // Hook for validating TikTok handle
 export const useValidateHandle = () => {
@@ -45,6 +46,11 @@ export const usePasswordSignup = () => {
 
       if (!password || password.length < 8) {
         throw new Error('Password must be at least 8 characters long');
+      }
+
+      // Check network status before making request
+      if (!navigator.onLine) {
+        throw new Error('No internet connection. Please check your network and try again.');
       }
 
       const request: PasswordSignupRequest = {

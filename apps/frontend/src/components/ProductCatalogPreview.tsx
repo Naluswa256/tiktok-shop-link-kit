@@ -7,30 +7,30 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const mockProducts = [
   {
     id: 1,
-    title: "Kampala Fashion Heels",
+    title: "Mens Shoes",
     price: "55,000",
-    imageUrl: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop&auto=format&q=80",
+    imageUrl: "https://merchandiseuganda.com/girogup/2021/09/WhatsApp-Image-2021-09-02-at-8.31.35-PM-750x450.jpeg",
     views: 234
   },
   {
     id: 2,
-    title: "African Print Bag",
-    price: "45,000",
-    imageUrl: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop&auto=format&q=80",
+    title: "Laptop",
+    price: "450,000",
+    imageUrl: "https://ug.jumia.is/unsafe/fit-in/680x680/filters:fill(white)/product/86/3629752/1.jpg?0324",
     views: 189
   },
   {
     id: 3,
-    title: "Gomesi Modern Style",
-    price: "120,000",
-    imageUrl: "https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=200&h=200&fit=crop&auto=format&q=80",
+    title: "iPhone 13 256GB - Pink in Uganda",
+    price: "2,700,000",
+    imageUrl: "https://istoreuganda.com/wp-content/uploads/2023/04/iPhone13_Pink_2048x.webp",
     views: 312
   },
   {
     id: 4,
-    title: "Ugandan Jewelry Set",
-    price: "35,000",
-    imageUrl: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=200&h=200&fit=crop&auto=format&q=80",
+    title: "Hisense 43 Inch Digital TV",
+    price: "685,000",
+    imageUrl: "https://www.tilyexpress.ug/wp-content/uploads/2022/11/1-2022-11-10T225024.183-1024x1024.webp",
     views: 156
   }
 ];

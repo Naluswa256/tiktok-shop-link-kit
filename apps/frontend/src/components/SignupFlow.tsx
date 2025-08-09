@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input } from '@/components/tiktok-commerce';
 import { ArrowRight, ArrowLeft, Check, AtSign, ExternalLink, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
@@ -34,7 +34,7 @@ export const SignupFlow = () => {
     isValidating: false
   });
 
-  const { validateHandle, passwordSignup, isLoading } = useAuthFlow();
+  const { validateHandle, passwordSignup } = useAuthFlow();
 
   // Handle TikTok handle validation and proceed to next step
   const handleValidateAndNext = async () => {
@@ -108,13 +108,16 @@ export const SignupFlow = () => {
 
   // Handle completing the signup flow
   const handleCompleteSignup = () => {
-    // Navigate to the actual shop page for owner setup
-    if (shopLink) {
-      navigate(shopLink);
-    } else {
-      const handle = cleanTikTokHandle(formData.tiktokHandle);
-      navigate(`/shop/${handle}`);
-    }
+    // Navigate to subscription page to show trial status and options
+    const handle = cleanTikTokHandle(formData.tiktokHandle);
+    navigate('/subscription', {
+      state: {
+        returnTo: `/shop/${handle}`,
+        reason: 'new_account',
+        message: 'Welcome! You have a 7-day free trial. Choose your plan to continue.',
+        shopLink: shopLink || `/shop/${handle}`
+      }
+    });
   };
 
   const isStepValid = () => {
@@ -330,7 +333,7 @@ export const SignupFlow = () => {
                   </div>
                   <h3 className="text-lg font-semibold">Account Created Successfully!</h3>
                   <p className="text-sm text-muted-foreground">
-                    Your shop is ready and live at:
+                    Your shop is ready! Next, choose your subscription plan.
                   </p>
                 </div>
 
@@ -340,6 +343,15 @@ export const SignupFlow = () => {
                       <p className="text-sm font-medium text-muted-foreground mb-2">Your Shop Link</p>
                       <p className="text-lg font-semibold text-primary break-all">
                         {getShopUrl()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium text-success">🎉 7-Day Free Trial Activated!</p>
+                      <p className="text-xs text-muted-foreground">
+                        Start posting TikTok videos with #TRACK to add products to your shop
                       </p>
                     </div>
                   </div>
@@ -357,7 +369,7 @@ export const SignupFlow = () => {
                       onClick={handleCompleteSignup}
                       className="flex-1"
                     >
-                      Continue Setup
+                      Choose Plan
                     </Button>
                   </div>
                 </div>

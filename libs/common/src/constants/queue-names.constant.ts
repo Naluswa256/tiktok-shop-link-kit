@@ -2,13 +2,13 @@ export const QUEUE_NAMES = {
   // Processing queues
   CAPTION_ANALYSIS: 'tiktok-caption-analysis-queue',
   THUMBNAIL_GENERATION: 'tiktok-thumbnail-generation-queue',
-  AUTO_TAGGING: 'tiktok-auto-tagging-queue',
+
   PRODUCT_EXTRACTION: 'tiktok-product-extraction-queue',
   
   // Dead letter queues
   CAPTION_ANALYSIS_DLQ: 'tiktok-caption-analysis-dlq',
   THUMBNAIL_GENERATION_DLQ: 'tiktok-thumbnail-generation-dlq',
-  AUTO_TAGGING_DLQ: 'tiktok-auto-tagging-dlq',
+
   PRODUCT_EXTRACTION_DLQ: 'tiktok-product-extraction-dlq',
   
   // Notification queues

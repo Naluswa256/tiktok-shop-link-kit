@@ -101,7 +101,8 @@ export class VideoService {
           });
 
         } catch (error) {
-          this.logger.warn(`Failed to generate thumbnail ${i} for ${videoId}`, { error: error.message });
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          this.logger.warn(`Failed to generate thumbnail ${i} for ${videoId}`, { error: errorMessage });
         }
       }
 
@@ -336,10 +337,11 @@ export class VideoService {
         const analysis = await this.analyzeFrame(framePath, i);
         analyses.push(analysis);
       } catch (error) {
-        this.logger.warn('Frame analysis failed', { 
-          videoId, 
-          frameFile, 
-          error: error.message 
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn('Frame analysis failed', {
+          videoId,
+          frameFile,
+          error: errorMessage
         });
       }
     }
@@ -527,8 +529,9 @@ export class VideoService {
 
       await sharp(framePath)
         .resize(this.config.thumbnailWidth, this.config.thumbnailHeight, {
-          fit: 'cover',
-          position: 'center'
+          fit: 'inside', // Preserve aspect ratio, no cropping
+          withoutEnlargement: true, // Don't upscale if source is smaller
+          background: { r: 0, g: 0, b: 0, alpha: 1 } // Black background for letterboxing if needed
         })
         .jpeg({
           quality: this.config.thumbnailQuality,

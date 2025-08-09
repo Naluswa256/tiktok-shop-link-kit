@@ -1,0 +1,10 @@
+# Example TikTok URLs for testing thumbnail generation
+# Add your own TikTok video URLs here (one per line)
+# Lines starting with # are comments and will be ignored
+
+# Fashion/Clothing examples
+
+https://www.tiktok.com/@mbogo.shoe.collec/video/7435219261523496248?is_from_webapp=1&sender_device=pc&web_id=7511385034386310662
+https://www.tiktok.com/@mensshoes15/video/7487875947937418502?is_from_webapp=1&sender_device=pc&web_id=7511385034386310662
+https://www.tiktok.com/@chrisfootwears/video/7495659876065004818?is_from_webapp=1&sender_device=pc&web_id=7511385034386310662
+https://www.tiktok.com/@tee.kicks.254/video/7483825973503266054?is_from_webapp=1&sender_device=pc&web_id=7511385034386310662

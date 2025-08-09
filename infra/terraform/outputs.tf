@@ -77,15 +77,7 @@ output "sqs_thumbnail_generation_queue_arn" {
   value       = module.sqs_thumbnail_generation.queue_arn
 }
 
-output "sqs_auto_tagging_queue_url" {
-  description = "URL of the auto tagging SQS queue"
-  value       = module.sqs_auto_tagging.queue_url
-}
 
-output "sqs_auto_tagging_queue_arn" {
-  description = "ARN of the auto tagging SQS queue"
-  value       = module.sqs_auto_tagging.queue_arn
-}
 
 # New Video Posted SNS Topic Outputs
 output "sns_new_video_posted_topic_arn" {
@@ -158,15 +150,7 @@ output "lambda_thumbnail_generator_function_arn" {
   value       = module.lambda_thumbnail_generator.function_arn
 }
 
-output "lambda_auto_tagger_function_name" {
-  description = "Name of the auto tagger Lambda function"
-  value       = module.lambda_auto_tagger.function_name
-}
 
-output "lambda_auto_tagger_function_arn" {
-  description = "ARN of the auto tagger Lambda function"
-  value       = module.lambda_auto_tagger.function_arn
-}
 
 # ECS Service Outputs
 output "ingestion_api_service_name" {
@@ -257,7 +241,7 @@ output "cloudwatch_log_group_names" {
     product_service      = try(module.product_service.log_group_name, "")
     caption_parser       = try(module.lambda_caption_parser.log_group_name, "")
     thumbnail_generator  = try(module.lambda_thumbnail_generator.log_group_name, "")
-    auto_tagger         = try(module.lambda_auto_tagger.log_group_name, "")
+
   }
 }
 
@@ -282,7 +266,7 @@ output "environment_variables" {
     SNS_NEW_VIDEO_POSTED_TOPIC_ARN     = module.sns_new_video_posted.topic_arn
     SQS_CAPTION_ANALYSIS_QUEUE_URL     = module.sqs_caption_analysis.queue_url
     SQS_THUMBNAIL_GENERATION_QUEUE_URL = module.sqs_thumbnail_generation.queue_url
-    SQS_AUTO_TAGGING_QUEUE_URL         = module.sqs_auto_tagging.queue_url
+
     
     # AWS
     AWS_REGION = var.aws_region

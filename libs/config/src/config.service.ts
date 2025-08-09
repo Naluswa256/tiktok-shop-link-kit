@@ -84,7 +84,7 @@ export class ConfigService {
           queues: {
             captionAnalysis: process.env.SQS_CAPTION_ANALYSIS_QUEUE || 'tiktok-caption-analysis-queue',
             thumbnailGeneration: process.env.SQS_THUMBNAIL_GENERATION_QUEUE || 'tiktok-thumbnail-generation-queue',
-            autoTagging: process.env.SQS_AUTO_TAGGING_QUEUE || 'tiktok-auto-tagging-queue'
+
           }
         },
         lambda: {

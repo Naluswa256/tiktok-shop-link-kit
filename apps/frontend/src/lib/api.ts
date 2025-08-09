@@ -1,5 +1,9 @@
 // API Client for TikTok Commerce Authentication
 import { toast } from 'sonner';
+import {
+  handleApiError as handleNetworkError,
+  retryWithBackoff
+} from './networkErrorHandler';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -216,6 +220,79 @@ export interface ShopData {
   analytics?: ShopAnalytics; // Owner-only
 }
 
+// Product-related types
+export interface ThumbnailInfo {
+  thumbnail_url: string;
+  thumbnail_s3_key: string;
+  frame_timestamp: number;
+  frame_index: number;
+  confidence_score: number;
+  quality_score: number;
+  detected_objects?: DetectedObject[];
+  is_primary: boolean;
+}
+
+export interface DetectedObject {
+  class_name: string;
+  confidence: number;
+  bbox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+export interface AssembledProduct {
+  seller_handle: string;
+  video_id: string;
+  title: string;
+  price: number | null;
+  sizes: string | null;
+  tags: string[];
+  thumbnails: ThumbnailInfo[];
+  primary_thumbnail: ThumbnailInfo;
+  confidence_score?: number;
+  raw_caption?: string;
+  processing_metadata: {
+    video_duration: number;
+    frames_analyzed: number;
+    thumbnails_generated: number;
+    processing_time_ms: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShopProductsResponse {
+  products: AssembledProduct[];
+  pagination: {
+    hasMore: boolean;
+    lastEvaluatedKey: string | null;
+    count: number;
+  };
+  metadata: {
+    sellerHandle: string;
+    since: string | null;
+    timestamp: string;
+  };
+}
+
+// Subscription-related types
+export interface SubscriptionStatus {
+  status: 'trial' | 'paid' | 'expired';
+  expiresAt: string;
+  daysLeft?: number;
+}
+
+export interface SubscriptionStatusResponse {
+  success: boolean;
+  data: SubscriptionStatus;
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
 export interface ShopResponse {
   success: boolean;
   data: ShopData;
@@ -224,12 +301,37 @@ export interface ShopResponse {
   requestId: string;
 }
 
-// Generic API client function
+export interface ProductsResponse {
+  success: boolean;
+  data: ShopProductsResponse;
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
+export interface ProductResponse {
+  success: boolean;
+  data: AssembledProduct;
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
+// Generic API client function with network error handling
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+
+  // Check if user is offline before making request
+  if (!navigator.onLine) {
+    const error = handleNetworkError(
+      new Error('No internet connection'),
+      `API request to ${endpoint}`
+    );
+    throw error;
+  }
 
   const config: RequestInit = {
     headers: {
@@ -240,27 +342,75 @@ async function apiRequest<T>(
   };
 
   try {
-    const response = await fetch(url, config);
-    const data = await response.json();
+    // Use retry with backoff for network resilience
+    return await retryWithBackoff(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    if (!response.ok) {
-      // Handle API errors - backend returns structured error responses
-      const error = data as ApiError;
-      throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
+      try {
+        const response = await fetch(url, {
+          ...config,
+          signal: controller.signal,
+        });
 
-    // Backend always returns { success: true, data: T, message: string, ... }
-    if (!data.success) {
-      throw new Error(data.message || 'API request failed');
-    }
+        clearTimeout(timeoutId);
 
-    return data;
+        // Handle non-JSON responses (like network errors)
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          if (!response.ok) {
+            const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as any;
+            error.statusCode = response.status;
+            throw error;
+          }
+          throw new Error('Invalid response format');
+        }
+
+        if (!response.ok) {
+          // Handle API errors - backend returns structured error responses
+          const error = data as ApiError;
+          const apiError = new Error(error.message || `HTTP ${response.status}: ${response.statusText}`) as any;
+          apiError.statusCode = response.status;
+          apiError.originalError = error;
+          throw apiError;
+        }
+
+        // Backend always returns { success: true, data: T, message: string, ... }
+        if (!data.success) {
+          const error = new Error(data.message || 'API request failed') as any;
+          error.statusCode = response.status;
+          error.originalError = data;
+          throw error;
+        }
+
+        return data;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+
+        // Handle fetch-specific errors
+        if (fetchError?.name === 'AbortError') {
+          const timeoutError = new Error('Request timed out') as any;
+          timeoutError.isTimeoutError = true;
+          throw timeoutError;
+        }
+
+        // Handle network errors
+        if (fetchError?.message?.includes('fetch') || fetchError?.message?.includes('network')) {
+          const networkError = new Error('Network error - please check your connection') as any;
+          networkError.isNetworkError = true;
+          networkError.originalError = fetchError;
+          throw networkError;
+        }
+
+        throw fetchError;
+      }
+    }, 2); // Retry up to 2 times
   } catch (error) {
-    // Network or parsing errors
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Network error - please check your connection');
+    // Handle and show appropriate error message
+    const networkError = handleNetworkError(error, `API request to ${endpoint}`);
+    throw networkError;
   }
 }
 
@@ -398,6 +548,61 @@ export const shopApi = {
   getShopSettings: async (handle: string, token: string): Promise<{ success: boolean; data: any; message: string }> => {
     return apiRequest(`/shop/${handle}/settings`, {
       method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+};
+
+// Product API functions
+export const productApi = {
+  // Get products for a shop - GET /shop/:handle/products
+  getShopProducts: async (
+    handle: string,
+    options?: {
+      limit?: number;
+      lastKey?: string;
+      since?: string;
+    }
+  ): Promise<ProductsResponse> => {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.lastKey) params.append('lastKey', options.lastKey);
+    if (options?.since) params.append('since', options.since);
+
+    const queryString = params.toString();
+    const endpoint = `/shop/${handle}/products${queryString ? `?${queryString}` : ''}`;
+
+    return apiRequest<ProductsResponse>(endpoint, {
+      method: 'GET',
+    });
+  },
+
+  // Get specific product - GET /shop/:handle/products/:videoId
+  getProduct: async (handle: string, videoId: string): Promise<ProductResponse> => {
+    return apiRequest<ProductResponse>(`/shop/${handle}/products/${videoId}`, {
+      method: 'GET',
+    });
+  },
+};
+
+// Subscription API functions
+export const subscriptionApi = {
+  // Get subscription status - GET /auth/subscription-status
+  getSubscriptionStatus: async (token: string): Promise<SubscriptionStatusResponse> => {
+    return apiRequest<SubscriptionStatusResponse>('/auth/subscription-status', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  // Subscribe - POST /auth/subscribe
+  subscribe: async (token: string): Promise<SubscriptionStatusResponse> => {
+    return apiRequest<SubscriptionStatusResponse>('/auth/subscribe', {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
       },

@@ -2,11 +2,10 @@
 
 ## Overview
 
-This guide covers the deployment of three lightweight, event-driven AI workers for the TikTok commerce ingestion pipeline:
+This guide covers the deployment of two lightweight, event-driven AI workers for the TikTok commerce ingestion pipeline:
 
 1. **Caption Parser** - Extracts product information from TikTok captions using LLM
-2. **Thumbnail Generator** - Creates product thumbnails from video frames using YOLO + FFmpeg  
-3. **Auto-Tagger** - Generates semantic tags for enhanced product categorization
+2. **Thumbnail Generator** - Creates product thumbnails from video frames using YOLO + FFmpeg
 
 ## Architecture
 
@@ -14,8 +13,7 @@ This guide covers the deployment of three lightweight, event-driven AI workers f
 Scheduled Ingestion → SNS (new-video-posted) → SQS Queues → AI Workers → SNS (processed events)
                                               ↓
                                     ┌─ caption-parser-queue
-                                    ├─ thumbnail-generator-queue  
-                                    └─ auto-tagger-queue
+                                    └─ thumbnail-generator-queue
 ```
 
 ## Worker Details
@@ -111,11 +109,7 @@ pip install -r requirements.txt
 npm run build
 zip -r thumbnail-generator.zip dist/ node_modules/ package.json python/
 
-# Auto-Tagger
-cd ../auto-tagger
-npm install
-npm run build
-zip -r auto-tagger.zip dist/ node_modules/ package.json
+
 ```
 
 ### 2. Deploy Infrastructure
@@ -144,9 +138,7 @@ aws lambda update-function-code \
   --function-name tiktok-commerce-dev-thumbnail-generator \
   --zip-file fileb://thumbnail-generator.zip
 
-aws lambda update-function-code \
-  --function-name tiktok-commerce-dev-auto-tagger \
-  --zip-file fileb://auto-tagger.zip
+
 ```
 
 ## Testing
@@ -166,11 +158,7 @@ npm run test
 # Requires video URL for testing
 ```
 
-### 3. Test Auto-Tagger
-```bash
-cd apps/ai-workers/auto-tagger
-npm run test
-```
+
 
 ### 4. End-to-End Test
 ```bash

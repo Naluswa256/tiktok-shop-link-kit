@@ -260,7 +260,7 @@ Ctrl+C
 ### Scaling Configuration
 
 #### Lambda Functions
-- **Memory**: 512MB (Caption Parser), 1024MB (Auto Tagger)
+- **Memory**: 512MB (Caption Parser), 1024MB (Thumbnail Generator)
 - **Timeout**: 15 minutes
 - **Concurrent Executions**: 100
 

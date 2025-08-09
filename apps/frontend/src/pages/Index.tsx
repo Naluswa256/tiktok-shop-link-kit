@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { SignupFlow } from '@/components/SignupFlow';
@@ -203,7 +203,9 @@ const Index = () => {
           )}
         </div>
       </section>
-
+  
+      
+    
       {/* Footer */}
       <footer className="border-t py-lg text-center space-y-sm">
         <p className="text-xs text-muted-foreground">

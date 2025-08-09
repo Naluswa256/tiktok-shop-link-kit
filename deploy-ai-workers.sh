@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Production Deployment Script for TikTok Commerce AI Workers
-# Deploys: Caption Parser, Thumbnail Generator, Auto Tagger
+# Deploys: Caption Parser, Thumbnail Generator
 # Sets up: SNS Topics, SQS Queues, S3 Buckets, Lambda Functions
 
 set -e
@@ -78,11 +78,11 @@ deploy_infrastructure() {
     # Get outputs for later use
     export SQS_CAPTION_PARSER_QUEUE=$(terraform output -raw caption_parser_queue_url)
     export SQS_THUMBNAIL_GENERATOR_QUEUE=$(terraform output -raw thumbnail_generator_queue_url)
-    export SQS_AUTO_TAGGER_QUEUE=$(terraform output -raw auto_tagger_queue_url)
+
     export SNS_VIDEO_POSTED_TOPIC=$(terraform output -raw video_posted_topic_arn)
     export SNS_CAPTION_PARSED_TOPIC=$(terraform output -raw caption_parsed_topic_arn)
     export SNS_THUMBNAIL_GENERATED_TOPIC=$(terraform output -raw thumbnail_generated_topic_arn)
-    export SNS_AUTO_TAGGED_TOPIC=$(terraform output -raw auto_tagged_topic_arn)
+
     export S3_THUMBNAILS_BUCKET=$(terraform output -raw thumbnails_bucket_name)
     
     cd ../..
@@ -164,50 +164,7 @@ deploy_thumbnail_generator() {
     echo -e "${GREEN}✅ Thumbnail Generator deployed${NC}"
 }
 
-# Build and deploy Auto Tagger
-deploy_auto_tagger() {
-    echo -e "${YELLOW}🏷️  Deploying Auto Tagger...${NC}"
-    
-    cd apps/ai-workers/auto-tagger
-    
-    # Install dependencies
-    npm install
-    
-    # Build application
-    npm run build
-    
-    # Create deployment package
-    zip -r auto-tagger-$ENVIRONMENT.zip \
-        dist/ \
-        node_modules/ \
-        package.json \
-        .env.production
-    
-    # Deploy to Lambda
-    aws lambda update-function-code \
-        --function-name "$PROJECT_NAME-$ENVIRONMENT-auto-tagger" \
-        --zip-file fileb://auto-tagger-$ENVIRONMENT.zip \
-        --region $AWS_REGION
-    
-    # Update environment variables
-    aws lambda update-function-configuration \
-        --function-name "$PROJECT_NAME-$ENVIRONMENT-auto-tagger" \
-        --environment Variables="{
-            NODE_ENV=production,
-            AWS_REGION=$AWS_REGION,
-            SQS_QUEUE_URL=$SQS_AUTO_TAGGER_QUEUE,
-            SNS_TOPIC_ARN=$SNS_AUTO_TAGGED_TOPIC,
-            LLM_PROVIDER=openrouter,
-            LLM_MODEL=$LLM_MODEL,
-            OPENROUTER_API_KEY=$OPENROUTER_API_KEY,
-            LOG_LEVEL=info
-        }" \
-        --region $AWS_REGION
-    
-    cd ../../..
-    
-    echo -e "${GREEN}✅ Auto Tagger deployed${NC}"
-}
+
 
 # Create local environment file for ingestion API
 create_local_env() {
@@ -292,7 +249,7 @@ show_summary() {
     echo "  SNS Video Posted: $SNS_VIDEO_POSTED_TOPIC"
     echo "  Caption Parser Queue: $SQS_CAPTION_PARSER_QUEUE"
     echo "  Thumbnail Generator Queue: $SQS_THUMBNAIL_GENERATOR_QUEUE"
-    echo "  Auto Tagger Queue: $SQS_AUTO_TAGGER_QUEUE"
+    echo ""
     echo ""
 }
 
@@ -302,7 +259,6 @@ main() {
     deploy_infrastructure
     deploy_caption_parser
     deploy_thumbnail_generator
-    deploy_auto_tagger
     create_local_env
     show_summary
 }

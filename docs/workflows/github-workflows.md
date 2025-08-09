@@ -226,7 +226,7 @@ env:
 strategy:
   matrix:
     service: [ingestion-api, product-service, whatsapp-service]
-    worker: [caption-parser, thumbnail-generator, auto-tagger]
+    worker: [caption-parser, thumbnail-generator]
 ```
 
 ### Conditional Execution

@@ -229,7 +229,7 @@ resource "aws_lambda_function" "caption_parser" {
 **SQS Queues**
 - **Caption Analysis Queue**: Video caption processing
 - **Thumbnail Generation Queue**: Image processing
-- **Auto Tagging Queue**: Content tagging
+
 - **Dead Letter Queues**: Failed message handling
 
 ## 🚀 Deployment Process

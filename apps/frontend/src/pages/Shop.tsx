@@ -1,13 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
 import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubscriptionPrompt } from '@/components/SubscriptionPrompt';
+import { TrialExpiryModal } from '@/components/SubscriptionGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { shopApi, ShopData, handleApiError } from '@/lib/api';
+import { shopApi, ShopData } from '@/lib/api';
+import { useShopProducts } from '@/hooks/useProducts';
+import { useProductUpdates } from '@/hooks/useProductUpdates';
+import { useTrialExpiryMonitor, useSubscriptionTimer } from '@/hooks/useSubscription';
 
 const Shop = () => {
   const navigate = useNavigate();
@@ -16,17 +20,26 @@ const Shop = () => {
   const { user, isAuthenticated, token } = useAuth();
 
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [showTrialExpiryModal, setShowTrialExpiryModal] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
   const [ownerData, setOwnerData] = useState<ShopData | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewCount, setViewCount] = useState<number>(0);
-  const [productCount, setProductCount] = useState<number>(0);
   const [isFirstTimeSignup, setIsFirstTimeSignup] = useState(false);
 
   const shopHandle = handle || 'unknown';
-  const hasProducts = productCount > 0; // Will be updated from API
   const isOwner = isAuthenticated && (user?.tiktokHandle === shopHandle || user?.shopHandle === shopHandle);
+
+  // Hooks for real-time features
+  const { data: productsData, isLoading: productsLoading, error: productsError } = useShopProducts(shopHandle);
+  const { status: wsStatus } = useProductUpdates(isOwner ? shopHandle : null);
+
+  const { isExpired, isWarning, timeLeft, subscriptionStatus } = useTrialExpiryMonitor();
+  const { formatTimeLeft } = useSubscriptionTimer();
+
+  const products = productsData?.data?.products || [];
+  const hasProducts = products.length > 0;
+  const hasActiveSubscription = subscriptionStatus?.status === 'trial' || subscriptionStatus?.status === 'paid';
 
   // Check if this is a first-time signup flow (coming from subscription selection)
   useEffect(() => {
@@ -36,17 +49,17 @@ const Shop = () => {
     setIsFirstTimeSignup(fromSubscription && isNewUser);
   }, [location.search]);
 
-  // Increment view count (would be connected to backend in production)
+  // Monitor trial expiry for owners
   useEffect(() => {
-    // Simulate view count increment
-    const randomViews = Math.floor(Math.random() * 100) + 10;
-    setViewCount(randomViews);
+    if (isOwner && isExpired) {
+      setShowTrialExpiryModal(true);
+    } else if (isOwner && isWarning) {
+      // Show warning toast for trial ending soon
+      toast.warning(`Trial ending soon: ${timeLeft}`);
+    }
+  }, [isOwner, isExpired, isWarning, timeLeft]);
 
-    // This would be an API call in production:
-    // shopApi.incrementShopViews(shopHandle);
-  }, [shopHandle]);
-
-  // Fetch shop data based on user status and scenario
+  // Fetch shop data based on user status
   const fetchShopData = async () => {
     if (!handle) {
       setLoading(false);
@@ -54,25 +67,8 @@ const Shop = () => {
     }
 
     try {
-      // Scenario 1: First-time signup (from subscription page) - get owner data immediately
-      if (isFirstTimeSignup && isAuthenticated && isOwner && token) {
-        const ownerResponse = await shopApi.getShopByHandleOwner(handle, token);
-        setOwnerData(ownerResponse.data);
-        setShopData(ownerResponse.data); // Use owner data as main data
-
-        if (ownerResponse.data.analytics) {
-          setViewCount(ownerResponse.data.analytics.total_views || 0);
-        }
-        if (ownerResponse.data.productCount !== undefined) {
-          setProductCount(ownerResponse.data.productCount);
-        }
-        setHasActiveSubscription(true);
-
-        toast.success('Welcome to your shop! You now have access to detailed analytics.');
-      }
-      // Scenario 2: Authenticated owner (returning user) - get owner data
-      else if (isAuthenticated && isOwner && token) {
-        // Get both public and owner data
+      if (isAuthenticated && isOwner && token) {
+        // Get both public and owner data for authenticated owners
         const [publicResponse, ownerResponse] = await Promise.all([
           shopApi.getShopByHandle(handle),
           shopApi.getShopByHandleOwner(handle, token)
@@ -88,30 +84,18 @@ const Shop = () => {
           setViewCount(publicResponse.data.viewCount);
         }
 
-        if (ownerResponse.data.productCount !== undefined) {
-          setProductCount(ownerResponse.data.productCount);
-        } else if (publicResponse.data.productCount !== undefined) {
-          setProductCount(publicResponse.data.productCount);
+        if (isFirstTimeSignup) {
+          toast.success('Welcome to your shop! You now have access to detailed analytics.');
         }
-
-        setHasActiveSubscription(true);
       }
-      // Scenario 3: Public access (buyers or unauthenticated users)
+      // Public access (buyers or unauthenticated users)
       else {
         const response = await shopApi.getShopByHandle(handle);
         setShopData(response.data);
 
-        // Update view count and product count from API response
+        // Update view count from API response
         if (response.data.viewCount) {
           setViewCount(response.data.viewCount);
-        }
-        if (response.data.productCount !== undefined) {
-          setProductCount(response.data.productCount);
-        }
-
-        // Update subscription status based on shop data
-        if (response.data.subscriptionStatus === 'trial' || response.data.subscriptionStatus === 'active') {
-          setHasActiveSubscription(true);
         }
       }
 
@@ -140,46 +124,30 @@ const Shop = () => {
     }
   };
 
-  // Check subscription status on component mount
+  // Fetch shop data on component mount
   useEffect(() => {
-    const checkSubscriptionStatus = () => {
-      // Check if user has active trial or subscription
-      const trialStarted = localStorage.getItem('buylink_trial_started');
-      const trialStartDate = localStorage.getItem('buylink_trial_start_date');
-
-      if (trialStarted && trialStartDate) {
-        const startDate = new Date(trialStartDate);
-        const now = new Date();
-        const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        // Trial is active for 7 days
-        if (daysSinceStart < 7) {
-          setHasActiveSubscription(true);
-          return;
-        }
-      }
-
-      // Check if this is a new user coming from signup
-      const fromSignup = location.state?.fromSignup;
-      const isFirstVisit = !localStorage.getItem('buylink_shop_visited_' + shopHandle);
-
-      if (isOwner && (fromSignup || isFirstVisit) && !hasActiveSubscription) {
-        setShowSubscriptionPrompt(true);
-        localStorage.setItem('buylink_shop_visited_' + shopHandle, 'true');
-      }
-    };
-
     if (handle) {
-      checkSubscriptionStatus();
       fetchShopData();
     }
-  }, [handle, isOwner, hasActiveSubscription, location.state, token, isAuthenticated, isFirstTimeSignup]);
+  }, [handle, isOwner, token, isAuthenticated]);
+
+  // Check for subscription prompt for new users
+  useEffect(() => {
+    const fromSignup = location.state?.fromSignup;
+    const isFirstVisit = !localStorage.getItem('buylink_shop_visited_' + shopHandle);
+
+    if (isOwner && (fromSignup || isFirstVisit) && !hasActiveSubscription) {
+      setShowSubscriptionPrompt(true);
+      localStorage.setItem('buylink_shop_visited_' + shopHandle, 'true');
+    }
+  }, [isOwner, hasActiveSubscription, location.state, shopHandle]);
 
   const handleSubscriptionComplete = () => {
-    setHasActiveSubscription(true);
     setShowSubscriptionPrompt(false);
     toast.success('Welcome to your shop! Start posting with #TRACK to add products.');
   };
+
+
 
   return (
     <>
@@ -295,7 +263,7 @@ const Shop = () => {
               ) : null}
 
               <div className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">{productCount}</span>
+                <span className="font-semibold text-foreground">{products.length}</span>
                 <span className="text-muted-foreground">products</span>
               </div>
 
@@ -485,6 +453,80 @@ const Shop = () => {
           </Card>
         )}
 
+        {/* Products Section */}
+        {hasActiveSubscription && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">Products</h3>
+                  {isOwner && wsStatus.connected && (
+                    <div className="flex items-center gap-2 text-xs text-success">
+                      <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                      Live updates
+                    </div>
+                  )}
+                </div>
+
+                {productsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="text-sm text-muted-foreground">Loading products...</div>
+                  </div>
+                ) : productsError ? (
+                  <div className="text-center py-8">
+                    <div className="text-sm text-destructive">Failed to load products</div>
+                  </div>
+                ) : hasProducts ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {products.map((product) => (
+                      <div key={product.video_id} className="border rounded-lg overflow-hidden">
+                        <div className="aspect-square bg-muted">
+                          <img
+                            src={product.primary_thumbnail.thumbnail_url}
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="p-3 space-y-2">
+                          <h4 className="text-sm font-medium text-foreground line-clamp-2">
+                            {product.title}
+                          </h4>
+                          {product.price && (
+                            <p className="text-sm font-semibold text-primary">
+                              UGX {product.price.toLocaleString()}
+                            </p>
+                          )}
+                          {product.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {product.tags.slice(0, 2).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 space-y-2">
+                    <div className="text-sm text-muted-foreground">No products yet</div>
+                    {isOwner && (
+                      <div className="text-xs text-muted-foreground">
+                        Post TikTok videos with #TRACK to add products
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Contact Section */}
         <Card>
           <CardContent className="p-lg">
@@ -514,6 +556,22 @@ const Shop = () => {
       onClose={() => setShowSubscriptionPrompt(false)}
       handle={shopHandle}
       onSubscribe={handleSubscriptionComplete}
+    />
+
+    {/* Trial Expiry Modal */}
+    <TrialExpiryModal
+      isOpen={showTrialExpiryModal}
+      onClose={() => setShowTrialExpiryModal(false)}
+      onSubscribe={() => {
+        setShowTrialExpiryModal(false);
+        navigate('/subscription', {
+          state: {
+            returnTo: location.pathname,
+            reason: 'trial_expired'
+          }
+        });
+      }}
+      timeLeft={formatTimeLeft}
     />
   </>
   );

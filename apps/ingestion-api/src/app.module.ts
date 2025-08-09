@@ -7,6 +7,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { ShopModule } from './shop/shop.module';
+import { AdminModule } from './admin/admin.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import {
   getAllConfigs,
@@ -37,6 +38,7 @@ import {
     ]),
     AuthModule,
     ShopModule,
+    AdminModule,
     IngestionModule,
     HealthModule,
   ],

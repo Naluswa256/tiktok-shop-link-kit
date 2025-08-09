@@ -7,6 +7,7 @@ import {
   UpdateItemCommand,
   DeleteItemCommand,
   QueryCommand,
+  ScanCommand,
   ConditionalCheckFailedException,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
@@ -356,5 +357,227 @@ export class UserRepository implements UserRepositoryInterface {
       updatedAt: item.updatedAt,
       lastLoginAt: item.lastLoginAt,
     };
+  }
+
+  async getAllUsers(limit?: number): Promise<User[]> {
+    try {
+      this.logger.log('Fetching all users with pagination');
+
+      const users: User[] = [];
+      let lastEvaluatedKey: any = undefined;
+      let scannedCount = 0;
+      const maxItems = limit || 10000; // Default limit to prevent memory issues
+
+      do {
+        const result = await this.dynamoClient.send(
+          new ScanCommand({
+            TableName: this.tableName,
+            FilterExpression: 'EntityType = :entityType',
+            ExpressionAttributeValues: marshall({
+              ':entityType': 'USER',
+            }),
+            Limit: Math.min(100, maxItems - scannedCount), // Scan in batches of 100
+            ExclusiveStartKey: lastEvaluatedKey,
+          })
+        );
+
+        if (result.Items && result.Items.length > 0) {
+          const batchUsers = result.Items.map(item => {
+            const unmarshalledItem = unmarshall(item) as UserDynamoDBItem;
+            return this.mapDynamoItemToUser(unmarshalledItem);
+          });
+
+          users.push(...batchUsers);
+          scannedCount += batchUsers.length;
+        }
+
+        lastEvaluatedKey = result.LastEvaluatedKey;
+
+        // Stop if we've reached the limit
+        if (scannedCount >= maxItems) {
+          break;
+        }
+      } while (lastEvaluatedKey);
+
+      this.logger.log(`Retrieved ${users.length} users (scanned ${scannedCount} items)`);
+      return users;
+    } catch (error) {
+      this.logger.error('Failed to get all users', error);
+      throw error;
+    }
+  }
+
+  async getUsersPaginated(options: {
+    limit?: number;
+    lastEvaluatedKey?: any;
+    subscriptionStatus?: string;
+  } = {}): Promise<{
+    users: User[];
+    lastEvaluatedKey?: any;
+    scannedCount: number;
+  }> {
+    try {
+      const { limit = 20, lastEvaluatedKey, subscriptionStatus } = options;
+
+      this.logger.log(`Fetching users paginated - limit: ${limit}, hasLastKey: ${!!lastEvaluatedKey}`);
+
+      let filterExpression = 'EntityType = :entityType';
+      const expressionAttributeValues: any = {
+        ':entityType': 'USER',
+      };
+
+      // Add subscription status filter if provided
+      if (subscriptionStatus) {
+        filterExpression += ' AND subscriptionStatus = :subscriptionStatus';
+        expressionAttributeValues[':subscriptionStatus'] = subscriptionStatus;
+      }
+
+      const result = await this.dynamoClient.send(
+        new ScanCommand({
+          TableName: this.tableName,
+          FilterExpression: filterExpression,
+          ExpressionAttributeValues: marshall(expressionAttributeValues),
+          Limit: limit,
+          ExclusiveStartKey: lastEvaluatedKey,
+        })
+      );
+
+      const users: User[] = [];
+      if (result.Items && result.Items.length > 0) {
+        result.Items.forEach(item => {
+          const unmarshalledItem = unmarshall(item) as UserDynamoDBItem;
+          users.push(this.mapDynamoItemToUser(unmarshalledItem));
+        });
+      }
+
+      this.logger.log(`Retrieved ${users.length} users in paginated query`);
+
+      return {
+        users,
+        lastEvaluatedKey: result.LastEvaluatedKey,
+        scannedCount: result.ScannedCount || 0,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get users paginated', error);
+      throw error;
+    }
+  }
+
+  async searchUsersByPhone(phoneSearch: string, limit: number = 50): Promise<User[]> {
+    try {
+      this.logger.log(`Searching users by phone: ${phoneSearch}`);
+
+      // Search using GSI2 (phone index) with begins_with
+      const result = await this.dynamoClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'GSI2',
+          KeyConditionExpression: 'begins_with(GSI2PK, :phonePrefix)',
+          ExpressionAttributeValues: marshall({
+            ':phonePrefix': `PHONE#${phoneSearch}`,
+          }),
+          Limit: limit,
+        })
+      );
+
+      const users: User[] = [];
+      if (result.Items && result.Items.length > 0) {
+        result.Items.forEach(item => {
+          const unmarshalledItem = unmarshall(item) as UserDynamoDBItem;
+          users.push(this.mapDynamoItemToUser(unmarshalledItem));
+        });
+      }
+
+      this.logger.log(`Found ${users.length} users matching phone search`);
+      return users;
+    } catch (error) {
+      this.logger.error(`Failed to search users by phone: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  async searchUsersByHandlePrefix(handlePrefix: string, limit: number = 50): Promise<User[]> {
+    try {
+      this.logger.log(`Searching users by handle prefix: ${handlePrefix}`);
+
+      // Search using GSI1 (handle index) with begins_with
+      const result = await this.dynamoClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'GSI1',
+          KeyConditionExpression: 'begins_with(GSI1PK, :handlePrefix)',
+          ExpressionAttributeValues: marshall({
+            ':handlePrefix': `HANDLE#${handlePrefix.toLowerCase()}`,
+          }),
+          Limit: limit,
+        })
+      );
+
+      const users: User[] = [];
+      if (result.Items && result.Items.length > 0) {
+        result.Items.forEach(item => {
+          const unmarshalledItem = unmarshall(item) as UserDynamoDBItem;
+          users.push(this.mapDynamoItemToUser(unmarshalledItem));
+        });
+      }
+
+      this.logger.log(`Found ${users.length} users matching handle prefix`);
+      return users;
+    } catch (error) {
+      this.logger.error(`Failed to search users by handle prefix: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  async searchUsersByText(searchText: string, limit: number = 100): Promise<User[]> {
+    try {
+      this.logger.log(`Performing text search: ${searchText}`);
+
+      const searchLower = searchText.toLowerCase();
+      const users: User[] = [];
+      let lastEvaluatedKey: any = undefined;
+      let scannedCount = 0;
+      const maxScan = limit * 10; // Scan more items to find matches
+
+      do {
+        const result = await this.dynamoClient.send(
+          new ScanCommand({
+            TableName: this.tableName,
+            FilterExpression: 'EntityType = :entityType AND (contains(#handle, :searchText) OR contains(#displayName, :searchText))',
+            ExpressionAttributeNames: {
+              '#handle': 'handle',
+              '#displayName': 'displayName',
+            },
+            ExpressionAttributeValues: marshall({
+              ':entityType': 'USER',
+              ':searchText': searchLower,
+            }),
+            Limit: Math.min(100, maxScan - scannedCount),
+            ExclusiveStartKey: lastEvaluatedKey,
+          })
+        );
+
+        if (result.Items && result.Items.length > 0) {
+          result.Items.forEach(item => {
+            const unmarshalledItem = unmarshall(item) as UserDynamoDBItem;
+            users.push(this.mapDynamoItemToUser(unmarshalledItem));
+          });
+        }
+
+        scannedCount += result.ScannedCount || 0;
+        lastEvaluatedKey = result.LastEvaluatedKey;
+
+        // Stop if we have enough results or scanned too many items
+        if (users.length >= limit || scannedCount >= maxScan) {
+          break;
+        }
+      } while (lastEvaluatedKey);
+
+      this.logger.log(`Text search found ${users.length} users (scanned ${scannedCount} items)`);
+      return users.slice(0, limit); // Ensure we don't return more than requested
+    } catch (error) {
+      this.logger.error(`Failed to perform text search: ${error.message}`, error);
+      throw error;
+    }
   }
 }

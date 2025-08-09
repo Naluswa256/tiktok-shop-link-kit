@@ -1,32 +1,56 @@
-name: CI/CD Pipeline
+name: TikTok Commerce Link Hub - CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, staging]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      force_deploy:
+        description: 'Force deployment even without changes'
+        required: false
+        default: false
+        type: boolean
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-  NODE_VERSION: '18'
+  PROJECT_NAME: buylink
+  NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
+  TERRAFORM_VERSION: '1.6.0'
 
 jobs:
-  # Detect changes to determine what to build
-  changes:
+  # Detect changes to determine what to build and deploy
+  detect-changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.changes.outputs.frontend }}
       ingestion-api: ${{ steps.changes.outputs.ingestion-api }}
       product-service: ${{ steps.changes.outputs.product-service }}
-      whatsapp-service: ${{ steps.changes.outputs.whatsapp-service }}
-      ai-workers: ${{ steps.changes.outputs.ai-workers }}
-      libs: ${{ steps.changes.outputs.libs }}
-      infra: ${{ steps.changes.outputs.infra }}
+      thumbnail-generator: ${{ steps.changes.outputs.thumbnail-generator }}
+      caption-parser: ${{ steps.changes.outputs.caption-parser }}
+      infrastructure: ${{ steps.changes.outputs.infrastructure }}
+      environment: ${{ steps.environment.outputs.environment }}
+      deploy: ${{ steps.deploy.outputs.deploy }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect file changes
+        uses: dorny/paths-filter@v3
         id: changes
         with:
           filters: |
@@ -36,313 +60,578 @@ jobs:
               - 'apps/ingestion-api/**'
             product-service:
               - 'apps/product-service/**'
-            whatsapp-service:
-              - 'apps/whatsapp-service/**'
-            ai-workers:
-              - 'apps/ai-workers/**'
-            libs:
-              - 'libs/**'
-            infra:
+            thumbnail-generator:
+              - 'apps/ai-workers/thumbnail-generator/**'
+            caption-parser:
+              - 'apps/ai-workers/caption-parser/**'
+            infrastructure:
               - 'infra/**'
+              - 'scripts/**'
 
-  # Install dependencies and build shared libraries
-  setup:
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.libs == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ingestion-api == 'true' || needs.changes.outputs.product-service == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build shared libraries
+      - name: Determine environment
+        id: environment
         run: |
-          npm run build --workspace=libs/common
-          npm run build --workspace=libs/config
-      
-      - name: Cache build artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            node_modules
-            libs/*/dist
-          key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
 
-  # Lint and test
-  lint-and-test:
+      - name: Determine if deployment needed
+        id: deploy
+        run: |
+          if [[ "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/staging") ]]; then
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Security and quality checks
+  security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
-    needs: [changes, setup]
-    if: always() && (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ingestion-api == 'true' || needs.changes.outputs.product-service == 'true' || needs.changes.outputs.libs == 'true')
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Restore cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            node_modules
-            libs/*/dist
-          key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}
-      
-      - name: Run linting
-        run: npm run lint
-      
-      - name: Run type checking
-        run: npm run type-check
-      
-      - name: Run tests
-        run: npm run test
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Build and test AI workers
-  ai-workers-test:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Lint and test Node.js services
+  test-nodejs:
+    name: Test Node.js Services
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.ai-workers == 'true'
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ingestion-api == 'true' || needs.detect-changes.outputs.product-service == 'true' || needs.detect-changes.outputs.frontend == 'true'
     strategy:
       matrix:
-        worker: [caption-parser, thumbnail-generator, auto-tagger]
+        service: [ingestion-api, product-service, frontend]
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint --workspace=apps/${{ matrix.service }}
+
+      - name: Run type checking
+        run: npm run type-check --workspace=apps/${{ matrix.service }}
+
+      - name: Run tests
+        run: npm run test --workspace=apps/${{ matrix.service }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.service }}
+          path: apps/${{ matrix.service }}/coverage/
+
+  # Test Python AI workers
+  test-ai-workers:
+    name: Test AI Workers
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.thumbnail-generator == 'true' || needs.detect-changes.outputs.caption-parser == 'true'
+    strategy:
+      matrix:
+        worker: [thumbnail-generator, caption-parser]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      
+
       - name: Install dependencies
         working-directory: apps/ai-workers/${{ matrix.worker }}
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+          pip install pytest pytest-cov
+
       - name: Run tests
         working-directory: apps/ai-workers/${{ matrix.worker }}
         run: |
-          python -m pytest --cov=. --cov-report=xml
-      
+          python -m pytest --cov=. --cov-report=xml --cov-report=html
+
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: apps/ai-workers/${{ matrix.worker }}/coverage.xml
           flags: ai-workers-${{ matrix.worker }}
 
-  # Build frontend
-  build-frontend:
+  # Validate Terraform
+  validate-terraform:
+    name: Validate Terraform
     runs-on: ubuntu-latest
-    needs: [changes, setup]
-    if: needs.changes.outputs.frontend == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Restore cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            node_modules
-            libs/*/dist
-          key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}
-      
-      - name: Build frontend
-        run: npm run build:frontend
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: frontend-build
-          path: apps/frontend/dist
-
-  # Build and push Docker images
-  build-docker:
-    runs-on: ubuntu-latest
-    needs: [changes, lint-and-test]
-    if: github.ref == 'refs/heads/main' && (needs.changes.outputs.ingestion-api == 'true' || needs.changes.outputs.product-service == 'true' || needs.changes.outputs.whatsapp-service == 'true')
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
     strategy:
       matrix:
-        service: [ingestion-api, product-service, whatsapp-service]
+        environment: [dev, staging, prod]
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-      
-      - name: Build, tag, and push image
-        working-directory: apps/${{ matrix.service }}
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/tiktok-commerce-${{ matrix.service }}:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/tiktok-commerce-${{ matrix.service }}:$IMAGE_TAG $ECR_REGISTRY/tiktok-commerce-${{ matrix.service }}:latest
-          docker push $ECR_REGISTRY/tiktok-commerce-${{ matrix.service }}:$IMAGE_TAG
-          docker push $ECR_REGISTRY/tiktok-commerce-${{ matrix.service }}:latest
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Build and push AI worker images
-  build-ai-workers:
-    runs-on: ubuntu-latest
-    needs: [changes, ai-workers-test]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.ai-workers == 'true'
-    strategy:
-      matrix:
-        worker: [caption-parser, thumbnail-generator, auto-tagger]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-      
-      - name: Build, tag, and push image
-        working-directory: apps/ai-workers/${{ matrix.worker }}
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/tiktok-commerce-${{ matrix.worker }}:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/tiktok-commerce-${{ matrix.worker }}:$IMAGE_TAG $ECR_REGISTRY/tiktok-commerce-${{ matrix.worker }}:latest
-          docker push $ECR_REGISTRY/tiktok-commerce-${{ matrix.worker }}:$IMAGE_TAG
-          docker push $ECR_REGISTRY/tiktok-commerce-${{ matrix.worker }}:latest
-
-  # Terraform plan
-  terraform-plan:
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.infra == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.5.0
-      
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
       - name: Terraform Init
         working-directory: infra/terraform
-        run: terraform init
-      
+        run: terraform init -backend-config="envs/${{ matrix.environment }}/backend.hcl"
+
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+
       - name: Terraform Plan
         working-directory: infra/terraform
-        run: terraform plan -var-file=dev.tfvars -out=tfplan
-      
-      - name: Upload plan
-        uses: actions/upload-artifact@v3
-        with:
-          name: terraform-plan
-          path: infra/terraform/tfplan
+        run: |
+          terraform plan \
+            -var-file="envs/${{ matrix.environment }}/terraform.tfvars" \
+            -var="apify_token=${{ secrets.APIFY_TOKEN }}" \
+            -var="openrouter_api_key=${{ secrets.OPENROUTER_API_KEY }}" \
+            -out=tfplan-${{ matrix.environment }}
 
-  # Terraform apply (only on main branch)
-  terraform-apply:
+      - name: Upload Terraform plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.environment }}
+          path: infra/terraform/tfplan-${{ matrix.environment }}
+
+  # Build and push Docker images
+  build-images:
+    name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [terraform-plan, build-docker, build-ai-workers]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.infra == 'true'
-    environment: production
+    needs: [detect-changes, test-nodejs, test-ai-workers]
+    if: always() && needs.detect-changes.outputs.deploy == 'true' && (needs.test-nodejs.result == 'success' || needs.test-nodejs.result == 'skipped') && (needs.test-ai-workers.result == 'success' || needs.test-ai-workers.result == 'skipped')
+    strategy:
+      matrix:
+        include:
+          - service: ingestion-api
+            dockerfile: Dockerfile
+            context: apps/ingestion-api
+          - service: product-service
+            dockerfile: Dockerfile
+            context: apps/product-service
+          - service: thumbnail-generator
+            dockerfile: Dockerfile.worker
+            context: apps/ai-workers/thumbnail-generator
+          - service: caption-parser
+            dockerfile: Dockerfile
+            context: apps/ai-workers/caption-parser
+          - service: scheduled-ingestion
+            dockerfile: Dockerfile.lambda
+            context: apps/ingestion-api
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build and tag image
+          docker buildx build \
+            --platform linux/amd64 \
+            --file ${{ matrix.context }}/${{ matrix.dockerfile }} \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --push \
+            ${{ matrix.context }}
+
+      - name: Image vulnerability scan
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Scan image for vulnerabilities
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --exit-code 1 --severity HIGH,CRITICAL \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG || echo "Vulnerabilities found but continuing..."
+
+  # Deploy infrastructure
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate-terraform]
+    if: needs.detect-changes.outputs.deploy == 'true' && needs.detect-changes.outputs.infrastructure == 'true'
+    environment: ${{ needs.detect-changes.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.5.0
-      
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Download plan
-        uses: actions/download-artifact@v3
+
+      - name: Download Terraform plan
+        uses: actions/download-artifact@v4
         with:
-          name: terraform-plan
+          name: terraform-plan-${{ needs.detect-changes.outputs.environment }}
           path: infra/terraform
-      
-      - name: Terraform Init
-        working-directory: infra/terraform
-        run: terraform init
-      
-      - name: Terraform Apply
-        working-directory: infra/terraform
-        run: terraform apply tfplan
 
-  # Deploy frontend to S3/CloudFront
-  deploy-frontend:
+      - name: Deploy infrastructure
+        working-directory: infra/terraform
+        run: |
+          # Initialize Terraform
+          terraform init -backend-config="envs/${{ needs.detect-changes.outputs.environment }}/backend.hcl"
+
+          # Apply the plan
+          terraform apply -auto-approve tfplan-${{ needs.detect-changes.outputs.environment }}
+
+      - name: Output infrastructure details
+        working-directory: infra/terraform
+        run: |
+          echo "## Infrastructure Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Outputs:" >> $GITHUB_STEP_SUMMARY
+          terraform output -json | jq -r 'to_entries[] | "- **\(.key)**: \(.value.value)"' >> $GITHUB_STEP_SUMMARY
+
+  # Setup secrets and environment
+  setup-secrets:
+    name: Setup Secrets & Environment
     runs-on: ubuntu-latest
-    needs: [build-frontend, terraform-apply]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.frontend == 'true'
+    needs: [detect-changes, deploy-infrastructure]
+    if: always() && needs.detect-changes.outputs.deploy == 'true' && (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
+    environment: ${{ needs.detect-changes.outputs.environment }}
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: frontend-build
-          path: dist
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Deploy to S3
-        run: |
-          aws s3 sync dist/ s3://${{ secrets.FRONTEND_S3_BUCKET }} --delete
-      
-      - name: Invalidate CloudFront
-        run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
 
-  # Notification
-  notify:
+      - name: Setup secrets
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          chmod +x scripts/setup-secrets.sh
+          ./scripts/setup-secrets.sh ${{ needs.detect-changes.outputs.environment }}
+
+      - name: Configure environment
+        run: |
+          chmod +x scripts/configure-environment.sh
+          ./scripts/configure-environment.sh ${{ needs.detect-changes.outputs.environment }}
+
+  # Deploy services to ECS
+  deploy-services:
+    name: Deploy ECS Services
     runs-on: ubuntu-latest
-    needs: [deploy-frontend, terraform-apply]
-    if: always() && github.ref == 'refs/heads/main'
+    needs: [detect-changes, build-images, setup-secrets]
+    if: always() && needs.detect-changes.outputs.deploy == 'true' && needs.build-images.result == 'success' && (needs.setup-secrets.result == 'success' || needs.setup-secrets.result == 'skipped')
+    strategy:
+      matrix:
+        service: [ingestion-api, product-service, thumbnail-generator, caption-parser]
     steps:
-      - name: Notify Slack
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS service
+        env:
+          CLUSTER_NAME: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-cluster
+          SERVICE_NAME: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Force new deployment with latest image
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          # Wait for deployment to complete
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Verify service health
+        env:
+          CLUSTER_NAME: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-cluster
+          SERVICE_NAME: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-${{ matrix.service }}
+        run: |
+          # Check service status
+          SERVICE_STATUS=$(aws ecs describe-services \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --query 'services[0].deployments[0].status' \
+            --output text)
+
+          if [ "$SERVICE_STATUS" != "PRIMARY" ]; then
+            echo "Service deployment failed: $SERVICE_STATUS"
+            exit 1
+          fi
+
+          echo "✅ Service ${{ matrix.service }} deployed successfully"
+
+  # Deploy Lambda functions
+  deploy-lambda:
+    name: Deploy Lambda Functions
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-images]
+    if: needs.detect-changes.outputs.deploy == 'true' && needs.build-images.result == 'success'
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Lambda function
+        env:
+          FUNCTION_NAME: ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-scheduled-ingestion
+          ECR_URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-scheduled-ingestion:${{ github.sha }}
+        run: |
+          # Update Lambda function code
+          aws lambda update-function-code \
+            --function-name $FUNCTION_NAME \
+            --image-uri $ECR_URI \
+            --region ${{ env.AWS_REGION }}
+
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name $FUNCTION_NAME \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Lambda function updated successfully"
+
+  # Health checks and smoke tests
+  health-checks:
+    name: Health Checks
+    runs-on: ubuntu-latest
+    needs: [detect-changes, deploy-services]
+    if: needs.detect-changes.outputs.deploy == 'true' && needs.deploy-services.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get ALB DNS name
+        id: alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names ${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          echo "dns_name=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Health check - Ingestion API
+        run: |
+          echo "Testing Ingestion API health..."
+          for i in {1..30}; do
+            if curl -f -s "http://${{ steps.alb.outputs.dns_name }}/api/ingestion/health"; then
+              echo "✅ Ingestion API is healthy"
+              break
+            fi
+            echo "Attempt $i/30 failed, waiting 10 seconds..."
+            sleep 10
+          done
+
+      - name: Health check - Product Service
+        run: |
+          echo "Testing Product Service health..."
+          for i in {1..30}; do
+            if curl -f -s "http://${{ steps.alb.outputs.dns_name }}/api/products/health"; then
+              echo "✅ Product Service is healthy"
+              break
+            fi
+            echo "Attempt $i/30 failed, waiting 10 seconds..."
+            sleep 10
+          done
+
+      - name: Smoke test - Basic functionality
+        run: |
+          echo "Running basic smoke tests..."
+
+          # Test API endpoints
+          curl -f -s "http://${{ steps.alb.outputs.dns_name }}/api/ingestion/health" || exit 1
+          curl -f -s "http://${{ steps.alb.outputs.dns_name }}/api/products/health" || exit 1
+
+          echo "✅ All smoke tests passed"
+
+  # Rollback capability
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    needs: [detect-changes, health-checks]
+    if: failure() && needs.detect-changes.outputs.deploy == 'true'
+    environment: ${{ needs.detect-changes.outputs.environment }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback ECS services
+        run: |
+          echo "Rolling back ECS services..."
+
+          SERVICES=("ingestion-api" "product-service" "thumbnail-generator" "caption-parser")
+
+          for service in "${SERVICES[@]}"; do
+            CLUSTER_NAME="${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-cluster"
+            SERVICE_NAME="${{ env.PROJECT_NAME }}-${{ needs.detect-changes.outputs.environment }}-$service"
+
+            echo "Rolling back $service..."
+
+            # Get previous task definition
+            CURRENT_TASK_DEF=$(aws ecs describe-services \
+              --cluster $CLUSTER_NAME \
+              --services $SERVICE_NAME \
+              --query 'services[0].taskDefinition' \
+              --output text)
+
+            # Get previous revision
+            TASK_FAMILY=$(echo $CURRENT_TASK_DEF | cut -d'/' -f2 | cut -d':' -f1)
+            CURRENT_REVISION=$(echo $CURRENT_TASK_DEF | cut -d':' -f2)
+            PREVIOUS_REVISION=$((CURRENT_REVISION - 1))
+
+            if [ $PREVIOUS_REVISION -gt 0 ]; then
+              PREVIOUS_TASK_DEF="$TASK_FAMILY:$PREVIOUS_REVISION"
+
+              aws ecs update-service \
+                --cluster $CLUSTER_NAME \
+                --service $SERVICE_NAME \
+                --task-definition $PREVIOUS_TASK_DEF
+
+              echo "✅ Rolled back $service to $PREVIOUS_TASK_DEF"
+            else
+              echo "⚠️ No previous revision found for $service"
+            fi
+          done
+
+  # Deployment notification
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [detect-changes, deploy-services, deploy-lambda, health-checks]
+    if: always() && needs.detect-changes.outputs.deploy == 'true'
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.deploy-services.result }}" == "success" && "${{ needs.health-checks.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Deployment successful" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Deployment failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Services Deployed:" >> $GITHUB_STEP_SUMMARY
+          echo "- Ingestion API" >> $GITHUB_STEP_SUMMARY
+          echo "- Product Service" >> $GITHUB_STEP_SUMMARY
+          echo "- Thumbnail Generator" >> $GITHUB_STEP_SUMMARY
+          echo "- Caption Parser" >> $GITHUB_STEP_SUMMARY
+          echo "- Scheduled Ingestion Lambda" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Slack (if configured)
+        if: env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
-          status: ${{ job.status }}
+          status: ${{ steps.status.outputs.status }}
           channel: '#deployments'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            ${{ steps.status.outputs.message }}
+            Environment: ${{ needs.detect-changes.outputs.environment }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

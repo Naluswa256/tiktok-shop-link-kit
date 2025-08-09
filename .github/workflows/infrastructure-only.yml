@@ -1,0 +1,155 @@
+name: Infrastructure Only Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy infrastructure to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: buylink
+  TERRAFORM_VERSION: '1.6.0'
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init -backend-config="envs/${{ github.event.inputs.environment }}/backend.hcl"
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        working-directory: infra/terraform
+        run: |
+          terraform plan \
+            -var-file="envs/${{ github.event.inputs.environment }}/terraform.tfvars" \
+            -var="apify_token=${{ secrets.APIFY_TOKEN }}" \
+            -var="openrouter_api_key=${{ secrets.OPENROUTER_API_KEY }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy Plan
+        if: github.event.inputs.action == 'destroy'
+        working-directory: infra/terraform
+        run: |
+          terraform plan -destroy \
+            -var-file="envs/${{ github.event.inputs.environment }}/terraform.tfvars" \
+            -var="apify_token=${{ secrets.APIFY_TOKEN }}" \
+            -var="openrouter_api_key=${{ secrets.OPENROUTER_API_KEY }}" \
+            -out=destroy-plan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve destroy-plan
+
+      - name: Output Results
+        if: github.event.inputs.action == 'apply'
+        working-directory: infra/terraform
+        run: |
+          echo "## Infrastructure ${{ github.event.inputs.action }} Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Outputs:" >> $GITHUB_STEP_SUMMARY
+          terraform output -json | jq -r 'to_entries[] | "- **\(.key)**: \(.value.value)"' >> $GITHUB_STEP_SUMMARY
+
+  setup-secrets:
+    name: Setup Secrets
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: github.event.inputs.action == 'apply'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup secrets
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          chmod +x scripts/setup-secrets.sh
+          ./scripts/setup-secrets.sh ${{ github.event.inputs.environment }}
+
+      - name: Configure environment
+        run: |
+          chmod +x scripts/configure-environment.sh
+          ./scripts/configure-environment.sh ${{ github.event.inputs.environment }}
+
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [terraform, setup-secrets]
+    if: always()
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.terraform.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Infrastructure ${{ github.event.inputs.action }} successful" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Infrastructure ${{ github.event.inputs.action }} failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create summary
+        run: |
+          echo "## 🏗️ Infrastructure ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action**: ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY

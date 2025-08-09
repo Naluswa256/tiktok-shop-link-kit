@@ -215,6 +215,7 @@ const Index = () => {
           <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
           <a href="#" className="hover:text-foreground transition-colors">Terms</a>
           <a href="#" className="hover:text-foreground transition-colors">Support</a>
+          <a href="/admin/login" className="hover:text-foreground transition-colors">Admin</a>
         </div>
       </footer>
     </Layout>

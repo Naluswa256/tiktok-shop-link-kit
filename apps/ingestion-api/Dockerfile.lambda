@@ -1,0 +1,17 @@
+# Lambda-specific Dockerfile for Scheduled Ingestion
+FROM public.ecr.aws/lambda/nodejs:18
+
+# Copy package files
+COPY package*.json ${LAMBDA_TASK_ROOT}/
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . ${LAMBDA_TASK_ROOT}/
+
+# Build the application
+RUN npm run build
+
+# Set the CMD to the Lambda handler
+CMD [ "dist/ingestion/handlers/scheduled-ingestion.handler" ]

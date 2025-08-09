@@ -28,6 +28,16 @@ export interface JwtConfig {
   expiresIn: string;
 }
 
+export interface AdminConfig {
+  username: string;
+  passwordHash: string;
+  jwtSecret: string;
+  jwtAccessExpiresIn: string;
+  jwtRefreshExpiresIn: string;
+  refreshCookieName: string;
+  sessionsTable: string;
+}
+
 export interface ApifyConfig {
   token?: string;
   actorId: string;
@@ -39,6 +49,7 @@ export interface Configuration {
   aws: AwsConfig;
   cognito: CognitoConfig;
   jwt: JwtConfig;
+  admin: AdminConfig;
   apify: ApifyConfig;
 }
 
@@ -70,6 +81,15 @@ export const configValidationSchema = Joi.object({
   // JWT configuration
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('1h'),
+
+  // Admin configuration
+  ADMIN_USERNAME: Joi.string().email().required(),
+  ADMIN_PASSWORD_HASH: Joi.string().min(60).required(), // bcrypt hash length
+  JWT_SECRET_ADMIN: Joi.string().min(32).required(),
+  JWT_ACCESS_EXPIRES_IN: Joi.string().default('900s'), // 15 minutes
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'), // 7 days
+  ADMIN_REFRESH_COOKIE_NAME: Joi.string().default('admin_refresh'),
+  ADMIN_SESSIONS_TABLE: Joi.string().default('AdminSessions'),
 
   // Apify configuration
   APIFY_TOKEN: Joi.string().optional(),
@@ -107,6 +127,16 @@ export const jwtConfig = registerAs('jwt', (): JwtConfig => ({
   expiresIn: process.env.JWT_EXPIRES_IN || '1h',
 }));
 
+export const adminConfig = registerAs('admin', (): AdminConfig => ({
+  username: process.env.ADMIN_USERNAME!,
+  passwordHash: process.env.ADMIN_PASSWORD_HASH!,
+  jwtSecret: process.env.JWT_SECRET_ADMIN!,
+  jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '900s',
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  refreshCookieName: process.env.ADMIN_REFRESH_COOKIE_NAME || 'admin_refresh',
+  sessionsTable: process.env.ADMIN_SESSIONS_TABLE || 'AdminSessions',
+}));
+
 export const apifyConfig = registerAs('apify', (): ApifyConfig => ({
   token: process.env.APIFY_TOKEN,
   actorId: process.env.APIFY_ACTOR_ID || 'clockworks/tiktok-profile-scraper',
@@ -119,6 +149,7 @@ export const getAllConfigs = () => [
   awsConfig,
   cognitoConfig,
   jwtConfig,
+  adminConfig,
   apifyConfig,
 ];
 
@@ -167,6 +198,15 @@ export const loadConfiguration = (): Configuration => {
     jwt: {
       secret: process.env.JWT_SECRET!,
       expiresIn: process.env.JWT_EXPIRES_IN || '1h',
+    },
+    admin: {
+      username: process.env.ADMIN_USERNAME!,
+      passwordHash: process.env.ADMIN_PASSWORD_HASH!,
+      jwtSecret: process.env.JWT_SECRET_ADMIN!,
+      jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '900s',
+      jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+      refreshCookieName: process.env.ADMIN_REFRESH_COOKIE_NAME || 'admin_refresh',
+      sessionsTable: process.env.ADMIN_SESSIONS_TABLE || 'AdminSessions',
     },
     apify: {
       token: process.env.APIFY_TOKEN,

@@ -68,10 +68,11 @@ resource "aws_lb_listener" "https" {
 
 # Target Groups
 resource "aws_lb_target_group" "ingestion_api" {
-  name     = "${var.name}-ingestion-api"
-  port     = 3001
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "${var.name}-ingestion-api"
+  port        = 3001
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"  # Required for Fargate
 
   health_check {
     enabled             = true
@@ -91,10 +92,11 @@ resource "aws_lb_target_group" "ingestion_api" {
 }
 
 resource "aws_lb_target_group" "product_service" {
-  name     = "${var.name}-product-service"
-  port     = 3002
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "${var.name}-product-service"
+  port        = 3002
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"  # Required for Fargate
 
   health_check {
     enabled             = true
@@ -102,7 +104,7 @@ resource "aws_lb_target_group" "product_service" {
     unhealthy_threshold = 2
     timeout             = 5
     interval            = 30
-    path                = "/health/database"
+    path                = "/health"
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"

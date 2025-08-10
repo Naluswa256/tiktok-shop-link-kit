@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProductsModule } from './products/products.module';
-import { CatalogModule } from './catalog/catalog.module';
 import { HealthModule } from './health/health.module';
 import { EventProcessorService } from './events/event-processor.service';
 import { DynamoDBService } from './database/dynamodb.service';
@@ -26,7 +25,6 @@ import { CleanupService } from './tasks/cleanup.service';
       },
     ]),
     ProductsModule,
-    CatalogModule,
     HealthModule,
   ],
   controllers: [AppController],

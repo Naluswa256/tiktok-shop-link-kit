@@ -146,23 +146,23 @@ resource "aws_cloudwatch_dashboard" "main" {
   })
 }
 
-# Composite Alarm for System Health
-resource "aws_cloudwatch_composite_alarm" "system_health" {
-  alarm_name        = "${var.name_prefix}-system-health"
-  alarm_description = "Overall system health composite alarm"
-
-  alarm_rule = join(" OR ", [
-    "ALARM(${var.name_prefix}-ingestion-api-cpu-high)",
-    "ALARM(${var.name_prefix}-product-service-cpu-high)",
-    "ALARM(${var.name_prefix}-thumbnail-generation-queue-depth)",
-    "ALARM(${var.name_prefix}-caption-parsing-queue-depth)"
-  ])
-
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
-
-  tags = var.tags
-}
+# Composite Alarm for System Health (commented out until individual alarms are created)
+# resource "aws_cloudwatch_composite_alarm" "system_health" {
+#   alarm_name        = "${var.name_prefix}-system-health"
+#   alarm_description = "Overall system health composite alarm"
+#
+#   alarm_rule = join(" OR ", [
+#     "ALARM(${var.name_prefix}-ingestion-api-cpu-high)",
+#     "ALARM(${var.name_prefix}-product-service-cpu-high)",
+#     "ALARM(${var.name_prefix}-thumbnail-generation-queue-depth)",
+#     "ALARM(${var.name_prefix}-caption-parsing-queue-depth)"
+#   ])
+#
+#   alarm_actions = [aws_sns_topic.alerts.arn]
+#   ok_actions    = [aws_sns_topic.alerts.arn]
+#
+#   tags = var.tags
+# }
 
 # Custom Metrics for Application Health
 resource "aws_cloudwatch_log_metric_filter" "error_count" {

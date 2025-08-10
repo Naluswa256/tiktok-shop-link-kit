@@ -57,29 +57,11 @@ variable "secure_parameters" {
     value       = string
     tier        = optional(string, "Standard")
   }))
-  default   = {}
-  sensitive = true
+  default = {}
 }
 
-# Service-specific configuration
-variable "ingestion_api_config" {
-  description = "Configuration for Ingestion API service"
-  type        = map(string)
-  default     = {}
-}
-
-variable "product_service_config" {
-  description = "Configuration for Product Service"
-  type        = map(string)
-  default     = {}
-}
-
-variable "ai_workers_config" {
-  description = "Configuration for AI Workers"
-  type        = map(string)
-  default     = {}
-  sensitive   = true
-}
+# Service-specific configuration (removed - now handled via ECS environment variables)
+# This reduces complexity and avoids sensitive value issues with for_each
 
 variable "tags" {
   description = "Tags to apply to resources"

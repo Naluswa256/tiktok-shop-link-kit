@@ -349,6 +349,12 @@ resource "aws_iam_role_policy_attachment" "lambda_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Attach AWS managed policy for Lambda VPC execution
+resource "aws_iam_role_policy_attachment" "lambda_vpc_execution" {
+  role       = aws_iam_role.lambda_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
 resource "aws_iam_role_policy" "lambda_execution_additional" {
   name = "${var.name_prefix}-lambda-execution-additional"
   role = aws_iam_role.lambda_execution.id

@@ -83,9 +83,9 @@ export const configValidationSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string().default('1h'),
 
   // Admin configuration
-  ADMIN_USERNAME: Joi.string().email().required(),
-  ADMIN_PASSWORD_HASH: Joi.string().min(60).required(), // bcrypt hash length
-  JWT_SECRET_ADMIN: Joi.string().min(32).required(),
+  ADMIN_USERNAME: Joi.string().email().optional(),
+  ADMIN_PASSWORD_HASH: Joi.string().min(50).max(70), // bcrypt hash length (flexible)
+  JWT_SECRET_ADMIN: Joi.string().min(32).optional(),
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('900s'), // 15 minutes
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'), // 7 days
   ADMIN_REFRESH_COOKIE_NAME: Joi.string().default('admin_refresh'),

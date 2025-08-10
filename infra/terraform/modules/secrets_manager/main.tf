@@ -30,7 +30,7 @@ resource "aws_secretsmanager_secret_version" "secrets" {
 
   secret_id = aws_secretsmanager_secret.secrets[each.key].id
   
-  secret_string = each.value.type == "json" ? jsonencode(each.value.value) : each.value.value
+  secret_string = each.value.type == "json" ? jsonencode(each.value.value) : tostring(each.value.value)
 
   lifecycle {
     ignore_changes = [secret_string]
@@ -57,7 +57,7 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
   for_each = local.application_secrets
 
   secret_id     = aws_secretsmanager_secret.app_secrets[each.key].id
-  secret_string = each.value.type == "json" ? jsonencode(each.value.value) : each.value.value
+  secret_string = each.value.type == "json" ? jsonencode(each.value.value) : tostring(each.value.value)
 
   lifecycle {
     ignore_changes = [secret_string]

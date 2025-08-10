@@ -14,6 +14,3 @@ output "budget_name" {
   description = "Name of the budget"
   value       = var.enable_budget_alerts ? aws_budgets_budget.monthly[0].name : null
 }
-
-# Data sources
-data "aws_region" "current" {}

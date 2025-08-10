@@ -6,7 +6,6 @@ resource "aws_cognito_user_pool" "main" {
 
   # Username configuration
   username_attributes = var.username_attributes
-  alias_attributes    = var.alias_attributes
 
   username_configuration {
     case_sensitive = false

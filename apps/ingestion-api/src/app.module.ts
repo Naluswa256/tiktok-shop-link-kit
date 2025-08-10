@@ -19,8 +19,10 @@ import {
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
-        `.env.${process.env.NODE_ENV || 'development'}`,
         '.env.local',
+        `.env.${process.env.NODE_ENV || 'development'}`,
+        '.env.production',
+        '.env.dev',
         '.env'
       ],
       load: getAllConfigs(),
@@ -29,6 +31,7 @@ import {
         allowUnknown: true,
         abortEarly: false,
       },
+      expandVariables: false, // Disable to prevent bcrypt hash corruption
     }),
     ThrottlerModule.forRoot([
       {

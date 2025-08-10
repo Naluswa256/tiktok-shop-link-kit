@@ -44,8 +44,7 @@ variable "secrets" {
     value       = any
     type        = optional(string, "string") # "string" or "json"
   }))
-  default   = {}
-  sensitive = true
+  default = {}
 }
 
 # Database configuration (for future RDS integration)

@@ -160,9 +160,22 @@ echo ""
 
 # Export environment variables from .env.production
 echo "Loading environment variables from .env.production..."
+
+# First, extract ADMIN_PASSWORD_HASH safely before sourcing (to avoid shell variable expansion issues)
+ADMIN_PASSWORD_HASH=$(grep "^ADMIN_PASSWORD_HASH=" .env.production | cut -d'=' -f2- | sed 's/^"//;s/"$//' | sed 's/\\$/$/g')
+export ADMIN_PASSWORD_HASH
+
+# Debug output to verify the hash is extracted correctly
+echo "DEBUG: ADMIN_PASSWORD_HASH length: ${#ADMIN_PASSWORD_HASH}"
+echo "DEBUG: ADMIN_PASSWORD_HASH value: $ADMIN_PASSWORD_HASH"
+
+# Now source the rest of the environment variables
 set -a  # automatically export all variables
 source .env.production
 set +a  # stop automatically exporting
+
+# Re-export the ADMIN_PASSWORD_HASH to ensure it's not overwritten
+export ADMIN_PASSWORD_HASH
 
 # Verify critical environment variables are loaded
 echo "Verifying environment variables..."

@@ -29,7 +29,7 @@ export class TimingMiddleware implements NestMiddleware {
 
     // Override res.end to capture response time
     const originalEnd = res.end;
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       const responseTime = Date.now() - startTime;
       
       // Log response
@@ -44,7 +44,7 @@ export class TimingMiddleware implements NestMiddleware {
       });
 
       // Call original end method
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();

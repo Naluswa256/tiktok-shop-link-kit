@@ -64,6 +64,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "buckets" {
       id     = rule.value.id
       status = rule.value.status
 
+      # Filter (required)
+      filter {
+        prefix = try(rule.value.prefix, "")
+      }
+
       # Expiration
       dynamic "expiration" {
         for_each = try(rule.value.expiration, null) != null ? [rule.value.expiration] : []

@@ -88,7 +88,7 @@ resource "aws_ecs_service" "service" {
   cluster         = var.cluster_id
   task_definition = aws_ecs_task_definition.service.arn
   desired_count   = var.desired_count
-  launch_type     = var.launch_type
+  launch_type     = length(var.capacity_provider_strategy) == 0 ? var.launch_type : null
 
   # Capacity provider strategy (for Fargate Spot)
   dynamic "capacity_provider_strategy" {
@@ -126,17 +126,12 @@ resource "aws_ecs_service" "service" {
   }
 
   # Deployment configuration
-  dynamic "deployment_configuration" {
-    for_each = [1]
-    content {
-      maximum_percent         = var.deployment_maximum_percent
-      minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
 
-      deployment_circuit_breaker {
-        enable   = var.enable_deployment_circuit_breaker
-        rollback = var.enable_deployment_rollback
-      }
-    }
+  deployment_circuit_breaker {
+    enable   = var.enable_deployment_circuit_breaker
+    rollback = var.enable_deployment_rollback
   }
 
   # Enable execute command for debugging

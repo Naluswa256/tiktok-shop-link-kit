@@ -70,24 +70,8 @@ resource "aws_ssm_parameter" "environment" {
   })
 }
 
-# Service-specific parameters
-resource "aws_ssm_parameter" "service_config" {
-  for_each = local.service_parameters
-
-  name        = "/${var.name_prefix}/services/${each.value.service}/${each.key}"
-  description = each.value.description
-  type        = each.value.type
-  value       = each.value.value
-  key_id      = each.value.type == "SecureString" ? var.kms_key_id : null
-  tier        = "Standard"
-
-  tags = merge(var.tags, {
-    Name        = "/${var.name_prefix}/services/${each.value.service}/${each.key}"
-    Type        = "ServiceConfig"
-    Service     = each.value.service
-    Sensitive   = each.value.type == "SecureString" ? "true" : "false"
-  })
-}
+# Service-specific parameters (removed due to sensitive value issues)
+# These will be managed through environment variables in ECS task definitions
 
 # Local values for parameter organization
 locals {
@@ -132,36 +116,8 @@ locals {
     }
   }
 
-  # Service-specific parameters
-  service_parameters = merge(
-    # Ingestion API parameters
-    {
-      for k, v in var.ingestion_api_config : "ingestion_api_${k}" => {
-        service     = "ingestion-api"
-        description = "Ingestion API ${k}"
-        type        = "String"
-        value       = tostring(v)
-      }
-    },
-    # Product Service parameters
-    {
-      for k, v in var.product_service_config : "product_service_${k}" => {
-        service     = "product-service"
-        description = "Product Service ${k}"
-        type        = "String"
-        value       = tostring(v)
-      }
-    },
-    # AI Workers parameters
-    {
-      for k, v in var.ai_workers_config : "ai_workers_${k}" => {
-        service     = "ai-workers"
-        description = "AI Workers ${k}"
-        type        = contains(["openrouter_api_key", "openai_api_key"], k) ? "SecureString" : "String"
-        value       = tostring(v)
-      }
-    }
-  )
+  # Service-specific parameters removed due to sensitive value issues
+  # Configuration is now handled through ECS environment variables
 }
 
 # Parameter hierarchy for easy retrieval

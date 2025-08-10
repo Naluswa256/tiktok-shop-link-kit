@@ -1,31 +1,10 @@
 # TikTok Commerce Link Hub - Main Terraform Configuration
 terraform {
   required_version = ">= 1.0"
-  
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
 
   backend "s3" {
     # Backend configuration will be provided via backend config file
     # or terraform init -backend-config
-  }
-}
-
-# Configure AWS Provider
-provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "terraform"
-      Repository  = "tiktok-shop-link-kit"
-    }
   }
 }
 
@@ -40,10 +19,10 @@ data "aws_availability_zones" "available" {
 locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.name
-  
+
   # Resource naming convention
   name_prefix = "${var.project_name}-${var.environment}"
-  
+
   # Common tags
   common_tags = {
     Project     = var.project_name
@@ -128,7 +107,7 @@ module "dynamodb_tables" {
       name           = "${local.name_prefix}-users"
       hash_key       = "PK"
       range_key      = "SK"
-      billing_mode   = "ON_DEMAND"
+      billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
       
       attributes = [
@@ -151,7 +130,7 @@ module "dynamodb_tables" {
       name           = "${local.name_prefix}-shops"
       hash_key       = "PK"
       range_key      = "SK"
-      billing_mode   = "ON_DEMAND"
+      billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
       
       attributes = [
@@ -174,7 +153,7 @@ module "dynamodb_tables" {
       name           = "${local.name_prefix}-products"
       hash_key       = "PK"
       range_key      = "SK"
-      billing_mode   = "ON_DEMAND"
+      billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
       
       attributes = [
@@ -197,7 +176,7 @@ module "dynamodb_tables" {
       name           = "${local.name_prefix}-admin-sessions"
       hash_key       = "PK"
       range_key      = "SK"
-      billing_mode   = "ON_DEMAND"
+      billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
       
       attributes = [
@@ -220,7 +199,7 @@ module "dynamodb_tables" {
       name           = "${local.name_prefix}-ingestion-state"
       hash_key       = "PK"
       range_key      = "SK"
-      billing_mode   = "ON_DEMAND"
+      billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
       
       attributes = [
@@ -418,7 +397,6 @@ module "ingestion_api_service" {
     NODE_ENV                       = var.environment == "prod" ? "production" : var.environment
     PORT                          = "3001"
     LOG_LEVEL                     = var.environment == "prod" ? "info" : "debug"
-    AWS_REGION                    = var.aws_region
     CORS_ORIGINS                  = join(",", var.cors_origins)
     DYNAMODB_USERS_TABLE          = module.dynamodb_tables.table_names["users"]
     DYNAMODB_SHOPS_TABLE          = module.dynamodb_tables.table_names["shops"]
@@ -503,7 +481,6 @@ module "product_service" {
     NODE_ENV                    = var.environment == "prod" ? "production" : var.environment
     PORT                       = "3002"
     LOG_LEVEL                  = var.environment == "prod" ? "info" : "debug"
-    AWS_REGION                 = var.aws_region
     ALLOWED_ORIGINS            = join(",", var.cors_origins)
     DYNAMODB_PRODUCTS_TABLE    = module.dynamodb_tables.table_names["products"]
     SQS_QUEUE_URL              = module.sqs_queues.queue_urls["product_assembly"]
@@ -571,7 +548,6 @@ module "thumbnail_generator_service" {
   # Environment variables
   environment_variables = {
     NODE_ENV                    = var.environment == "prod" ? "production" : var.environment
-    AWS_REGION                  = var.aws_region
     SQS_QUEUE_URL               = module.sqs_queues.queue_urls["thumbnail_generation"]
     SNS_TOPIC_ARN               = module.sns_topics.topic_arns["new_video_posted"]
     S3_BUCKET_NAME              = module.s3_buckets.bucket_names["thumbnails"]
@@ -643,7 +619,6 @@ module "caption_parser_service" {
   # Environment variables
   environment_variables = {
     NODE_ENV          = var.environment == "prod" ? "production" : var.environment
-    AWS_REGION        = var.aws_region
     SQS_QUEUE_URL     = module.sqs_queues.queue_urls["caption_parsing"]
     SNS_TOPIC_ARN     = module.sns_topics.topic_arns["new_video_posted"]
     LLM_PROVIDER      = "openrouter"
@@ -705,42 +680,7 @@ module "parameter_store" {
   cors_origins = var.cors_origins
   log_level    = var.environment == "prod" ? "info" : "debug"
 
-  # Service configurations
-  ingestion_api_config = {
-    port                = "3001"
-    cpu                 = tostring(var.ingestion_api_config.cpu)
-    memory              = tostring(var.ingestion_api_config.memory)
-    min_capacity        = tostring(var.ingestion_api_config.min_capacity)
-    max_capacity        = tostring(var.ingestion_api_config.max_capacity)
-    target_cpu_percent  = tostring(var.ingestion_api_config.target_cpu_percent)
-    apify_actor_id      = var.apify_actor_id
-  }
-
-  product_service_config = {
-    port                = "3002"
-    cpu                 = tostring(var.product_service_config.cpu)
-    memory              = tostring(var.product_service_config.memory)
-    min_capacity        = tostring(var.product_service_config.min_capacity)
-    max_capacity        = tostring(var.product_service_config.max_capacity)
-    target_cpu_percent  = tostring(var.product_service_config.target_cpu_percent)
-  }
-
-  ai_workers_config = {
-    thumbnail_cpu          = tostring(var.thumbnail_generator_config.cpu)
-    thumbnail_memory       = tostring(var.thumbnail_generator_config.memory)
-    thumbnail_min_capacity = tostring(var.thumbnail_generator_config.min_capacity)
-    thumbnail_max_capacity = tostring(var.thumbnail_generator_config.max_capacity)
-    caption_cpu            = tostring(var.caption_parser_config.cpu)
-    caption_memory         = tostring(var.caption_parser_config.memory)
-    caption_min_capacity   = tostring(var.caption_parser_config.min_capacity)
-    caption_max_capacity   = tostring(var.caption_parser_config.max_capacity)
-    max_video_size_mb      = "300"
-    max_video_duration_seconds = "3600"
-    thumbnails_to_generate = "5"
-    yolo_model_path        = "yolov8n.pt"
-    llm_provider           = "openrouter"
-    llm_model              = "microsoft/phi-3-mini-128k-instruct"
-  }
+  # Service configurations now handled via ECS environment variables
 
   # AWS resource references for applications
   standard_parameters = {
@@ -860,7 +800,6 @@ module "eventbridge" {
   # Environment variables for Lambda
   lambda_environment_variables = {
     NODE_ENV                       = var.environment == "prod" ? "production" : var.environment
-    AWS_REGION                     = var.aws_region
     DYNAMODB_USERS_TABLE          = module.dynamodb_tables.table_names["users"]
     DYNAMODB_SHOPS_TABLE          = module.dynamodb_tables.table_names["shops"]
     DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_tables.table_names["ingestion_state"]

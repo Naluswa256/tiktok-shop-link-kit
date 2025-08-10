@@ -120,7 +120,7 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
   private async testTableAccess(tableName: string): Promise<void> {
     const command = new QueryCommand({
       TableName: tableName,
-      KeyConditionExpression: 'seller_handle = :test',
+      KeyConditionExpression: 'PK = :test',
       ExpressionAttributeValues: {
         ':test': '__connectivity_test__',
       },
@@ -236,6 +236,9 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
         TableName: this.stagingTable,
         Item: {
           ...data,
+          // Map to DynamoDB key schema for staging table
+          PK: data.video_id,
+          SK: data.seller_handle,
           // Ensure consistent data types
           ttl: Number(data.ttl),
           is_complete: Boolean(data.is_complete),
@@ -275,8 +278,8 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       const command = new GetCommand({
         TableName: this.stagingTable,
         Key: {
-          video_id: videoId,
-          seller_handle: sellerHandle,
+          PK: videoId,
+          SK: sellerHandle,
         },
         ConsistentRead: true, // Ensure we get the latest data
       });
@@ -300,11 +303,11 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       const command = new DeleteCommand({
         TableName: this.stagingTable,
         Key: {
-          video_id: videoId,
-          seller_handle: sellerHandle,
+          PK: videoId,
+          SK: sellerHandle,
         },
         // Optional: Add condition to ensure we're deleting the right item
-        ConditionExpression: 'attribute_exists(video_id)',
+        ConditionExpression: 'attribute_exists(PK)',
       });
 
       return await this.docClient.send(command);
@@ -330,6 +333,9 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       // Ensure data consistency and proper types
       const productItem = {
         ...product,
+        // Map to DynamoDB key schema
+        PK: product.seller_handle,
+        SK: product.video_id,
         price: product.price !== null ? Number(product.price) : null,
         thumbnails: product.thumbnails.map(thumb => ({
           ...thumb,
@@ -360,7 +366,7 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       const command = new PutCommand({
         TableName: this.productsTable,
         Item: productItem,
-        ConditionExpression: 'attribute_not_exists(video_id)', // Prevent duplicates
+        ConditionExpression: 'attribute_not_exists(PK)', // Prevent duplicates
       });
 
       return await this.docClient.send(command);
@@ -448,7 +454,7 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
 
       const command = new QueryCommand({
         TableName: this.productsTable,
-        KeyConditionExpression: 'seller_handle = :seller_handle',
+        KeyConditionExpression: 'PK = :seller_handle',
         ExpressionAttributeValues: expressionAttributeValues,
         ...(Object.keys(expressionAttributeNames).length > 0 && {
           ExpressionAttributeNames: expressionAttributeNames,
@@ -501,8 +507,8 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       const command = new GetCommand({
         TableName: this.productsTable,
         Key: {
-          seller_handle: sellerHandle,
-          video_id: videoId,
+          PK: sellerHandle,
+          SK: videoId,
         },
         ConsistentRead: false, // Eventually consistent is fine for product details
       });
@@ -580,8 +586,8 @@ export class DynamoDBService implements OnModuleInit, OnModuleDestroy {
       const deleteRequests = batch.map(item => ({
         DeleteRequest: {
           Key: {
-            video_id: item.video_id,
-            seller_handle: item.seller_handle,
+            PK: item.video_id,
+            SK: item.seller_handle,
           },
         },
       }));

@@ -5,6 +5,12 @@ import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+// Polyfill for crypto.randomUUID() in Node.js 18
+if (!globalThis.crypto) {
+  const { webcrypto } = require('crypto');
+  globalThis.crypto = webcrypto;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   

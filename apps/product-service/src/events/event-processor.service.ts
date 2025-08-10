@@ -37,9 +37,9 @@ export class EventProcessorService {
       region: this.configService.get('AWS_REGION', 'us-east-1'),
     });
 
-    this.captionQueueUrl = this.configService.get('SQS_CAPTION_ANALYSIS_QUEUE_URL', '');
-    this.thumbnailQueueUrl = this.configService.get('SQS_THUMBNAIL_GENERATION_QUEUE_URL', '');
-    this.newProductTopicArn = this.configService.get('SNS_NEW_PRODUCT_TOPIC_ARN', '');
+    this.captionQueueUrl = this.configService.get('SQS_CAPTION_QUEUE_URL', '');
+    this.thumbnailQueueUrl = this.configService.get('SQS_THUMBNAIL_QUEUE_URL', '');
+    this.newProductTopicArn = this.configService.get('SNS_TOPIC_ARN', '');
   }
 
   /**

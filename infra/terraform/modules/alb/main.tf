@@ -80,7 +80,7 @@ resource "aws_lb_target_group" "ingestion_api" {
     unhealthy_threshold = 2
     timeout             = 5
     interval            = 30
-    path                = "/health"
+    path                = "/api/v1/health"
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"
@@ -104,7 +104,7 @@ resource "aws_lb_target_group" "product_service" {
     unhealthy_threshold = 2
     timeout             = 5
     interval            = 30
-    path                = "/health"
+    path                = "/api/v1/health"
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"

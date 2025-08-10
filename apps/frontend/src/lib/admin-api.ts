@@ -79,8 +79,12 @@ class AdminApiClient {
   private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
+    // Extract base URL from VITE_API_URL (remove /api/v1 suffix if present)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+    const baseURL = apiUrl.replace('/api/v1', '');
+
     this.client = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+      baseURL,
       timeout: 30000,
       withCredentials: true, // Important for HttpOnly cookies
       headers: {

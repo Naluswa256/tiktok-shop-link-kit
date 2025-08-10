@@ -201,12 +201,28 @@ module "dynamodb_tables" {
       range_key      = "SK"
       billing_mode   = "PAY_PER_REQUEST"
       stream_enabled = false
-      
+
       attributes = [
         { name = "PK", type = "S" },
         { name = "SK", type = "S" }
       ]
-      
+
+      global_secondary_indexes = []
+    }
+
+    staging = {
+      name           = "${local.name_prefix}-staging"
+      hash_key       = "PK"
+      range_key      = "SK"
+      billing_mode   = "PAY_PER_REQUEST"
+      stream_enabled = false
+      ttl_attribute  = "ttl"
+
+      attributes = [
+        { name = "PK", type = "S" },
+        { name = "SK", type = "S" }
+      ]
+
       global_secondary_indexes = []
     }
   }
@@ -483,7 +499,10 @@ module "product_service" {
     LOG_LEVEL                  = var.environment == "prod" ? "info" : "debug"
     ALLOWED_ORIGINS            = join(",", var.cors_origins)
     DYNAMODB_PRODUCTS_TABLE    = module.dynamodb_tables.table_names["products"]
+    DYNAMODB_STAGING_TABLE     = module.dynamodb_tables.table_names["staging"]
     SQS_QUEUE_URL              = module.sqs_queues.queue_urls["product_assembly"]
+    SQS_CAPTION_QUEUE_URL      = module.sqs_queues.queue_urls["caption_parsing"]
+    SQS_THUMBNAIL_QUEUE_URL    = module.sqs_queues.queue_urls["thumbnail_generation"]
     SNS_TOPIC_ARN              = module.sns_topics.topic_arns["new_video_posted"]
   }
 
@@ -704,6 +723,10 @@ module "parameter_store" {
     "aws/dynamodb/ingestion_state_table" = {
       description = "DynamoDB Ingestion State table name"
       value       = module.dynamodb_tables.table_names["ingestion_state"]
+    }
+    "aws/dynamodb/staging_table" = {
+      description = "DynamoDB Staging table name"
+      value       = module.dynamodb_tables.table_names["staging"]
     }
 
     # SNS Topic ARNs

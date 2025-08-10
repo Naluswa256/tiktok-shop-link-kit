@@ -1,6 +1,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { IngestionModule } from './ingestion/ingestion.module';
@@ -33,6 +34,7 @@ import {
       },
       expandVariables: false, // Disable to prevent bcrypt hash corruption
     }),
+    ScheduleModule.forRoot(), // Enable scheduled tasks globally
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute

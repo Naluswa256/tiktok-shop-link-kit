@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 
 // Controllers
 import { AdminController } from './controllers/admin.controller';
@@ -22,7 +21,6 @@ import { AdminJwtAuthGuard } from './guards/admin-jwt-auth.guard';
 @Module({
   imports: [
     ConfigModule,
-    ScheduleModule.forRoot(), // Enable scheduled tasks
     // JWT module for admin tokens
     JwtModule.registerAsync({
       imports: [ConfigModule],

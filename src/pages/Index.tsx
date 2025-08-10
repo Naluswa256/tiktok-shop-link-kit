@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { SignupFlow } from '@/components/SignupFlow';
 import { FeatureCard } from '@/components/FeatureCard';
@@ -213,6 +213,7 @@ const Index = () => {
           <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
           <a href="#" className="hover:text-foreground transition-colors">Terms</a>
           <a href="#" className="hover:text-foreground transition-colors">Support</a>
+          <Link to="/admin/login" className="hover:text-foreground transition-colors">Admin</Link>
         </div>
       </footer>
     </Layout>

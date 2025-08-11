@@ -24,8 +24,8 @@ const Index = () => {
   return (
     <Layout
       header={
-        <Header 
-          title="BuyLink UG" 
+        <Header
+          title="buylink"
           actions={
             <Button 
               variant="ghost" 

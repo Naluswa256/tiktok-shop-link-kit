@@ -19,11 +19,14 @@ const AdminLogin: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
-  // Check auth status when component mounts and redirect if already authenticated
+  // Check auth status once when component mounts
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    if (!hasCheckedAuth) {
+      checkAuth().finally(() => setHasCheckedAuth(true));
+    }
+  }, [hasCheckedAuth, checkAuth]);
 
   useEffect(() => {
     if (isAuthenticated) {

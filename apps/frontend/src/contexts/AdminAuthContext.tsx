@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { adminApi, AdminLoginRequest, handleAdminApiError } from '@/lib/admin-api';
 import { toast } from 'sonner';
 
@@ -75,13 +75,13 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
     }
   };
 
-  const checkAuth = async (): Promise<boolean> => {
+  const checkAuth = useCallback(async (): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
       // Attempt silent refresh to check if we have valid session
       const isValid = await adminApi.silentRefresh();
-      
+
       if (isValid) {
         // We have a valid session, but we need to get admin info
         // For now, we'll set a default admin user since we don't have user info endpoint
@@ -101,7 +101,7 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const value: AdminAuthContextType = {
     admin,

@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAuthFlow } from '@/hooks/useAuth';
 import { cleanTikTokHandle } from '@/lib/api';
 import { toast } from 'sonner';
+import { PasswordRequirements } from '@/components/PasswordRequirements';
+import { isPasswordValid } from '@/lib/password-validation';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -66,6 +68,11 @@ export const SignupFlow = () => {
       }
     } else if (currentStep === 2) {
       // Create account with password
+      if (!isPasswordValid(formData.password)) {
+        toast.error('Please ensure your password meets all requirements');
+        return;
+      }
+
       if (formData.password !== formData.confirmPassword) {
         toast.error('Passwords do not match');
         return;
@@ -125,7 +132,7 @@ export const SignupFlow = () => {
       case 1:
         return formData.tiktokHandle.length > 0 && !handleValidation.isValidating;
       case 2:
-        return formData.password.length >= 8 &&
+        return isPasswordValid(formData.password) &&
                formData.confirmPassword.length >= 8 &&
                formData.password === formData.confirmPassword;
       case 3:
@@ -279,7 +286,6 @@ export const SignupFlow = () => {
                       placeholder="Enter your password"
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
-                      helper="Must be at least 8 characters long"
                       className="pr-10"
                     />
                     <button
@@ -294,6 +300,13 @@ export const SignupFlow = () => {
                       )}
                     </button>
                   </div>
+
+                  {/* Password Requirements */}
+                  {formData.password && (
+                    <div className="mt-3">
+                      <PasswordRequirements password={formData.password} />
+                    </div>
+                  )}
 
                   <div className="relative">
                     <Input

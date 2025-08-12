@@ -10,7 +10,7 @@ import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading: authLoading } = useAdminAuth();
+  const { login, isAuthenticated, isLoading: authLoading, checkAuth } = useAdminAuth();
   
   const [formData, setFormData] = useState({
     username: '',
@@ -20,7 +20,11 @@ const AdminLogin: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if already authenticated
+  // Check auth status when component mounts and redirect if already authenticated
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/admin/dashboard', { replace: true });

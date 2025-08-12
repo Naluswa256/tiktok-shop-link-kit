@@ -28,10 +28,8 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
 
   const isAuthenticated = !!admin;
 
-  // Check authentication status on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  // Don't automatically check auth on mount to avoid unnecessary API calls
+  // Auth will be checked when needed (e.g., when accessing admin routes)
 
   const login = async (credentials: AdminLoginRequest): Promise<boolean> => {
     try {
@@ -135,13 +133,21 @@ interface AdminRouteGuardProps {
   fallback?: ReactNode;
 }
 
-export const AdminRouteGuard: React.FC<AdminRouteGuardProps> = ({ 
-  children, 
-  fallback = <div>Loading...</div> 
+export const AdminRouteGuard: React.FC<AdminRouteGuardProps> = ({
+  children,
+  fallback = <div>Loading...</div>
 }) => {
-  const { isAuthenticated, isLoading } = useAdminAuth();
+  const { isAuthenticated, isLoading, checkAuth } = useAdminAuth();
+  const [hasChecked, setHasChecked] = useState(false);
 
-  if (isLoading) {
+  // Check auth only when this guard is mounted (i.e., when accessing admin routes)
+  React.useEffect(() => {
+    if (!hasChecked) {
+      checkAuth().finally(() => setHasChecked(true));
+    }
+  }, [hasChecked, checkAuth]);
+
+  if (!hasChecked || isLoading) {
     return <>{fallback}</>;
   }
 

@@ -15,7 +15,7 @@ variable "morning_schedule_expression" {
 variable "evening_schedule_expression" {
   description = "Schedule expression for evening ingestion"
   type        = string
-  default     = "cron(0 18 * * ? *)" # 6:00 PM UTC daily
+  default     = "cron(5 8 * * ? *)" # 08:05 AM UTC daily (11:05 AM Uganda time)
 }
 
 # Lambda Configuration

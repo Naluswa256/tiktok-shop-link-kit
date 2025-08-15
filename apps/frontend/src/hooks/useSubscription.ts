@@ -10,9 +10,9 @@ export const subscriptionKeys = {
   status: () => [...subscriptionKeys.all, 'status'] as const,
 };
 
-// Hook to get subscription status
-export const useSubscriptionStatus = () => {
-  const { token } = useAuth();
+// Hook to get subscription status - only for authenticated users
+export const useSubscriptionStatus = (enabled: boolean = true) => {
+  const { token, isAuthenticated } = useAuth();
 
   return useQuery({
     queryKey: subscriptionKeys.status(),
@@ -20,7 +20,7 @@ export const useSubscriptionStatus = () => {
       if (!token) throw new Error('No authentication token');
       return subscriptionApi.getSubscriptionStatus(token);
     },
-    enabled: !!token,
+    enabled: !!token && isAuthenticated && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     retry: (failureCount, error) => {
@@ -61,12 +61,16 @@ export const useSubscribe = () => {
   });
 };
 
-// Hook to check subscription and redirect if needed
-export const useSubscriptionGuard = () => {
+// Hook to check subscription and redirect if needed - only for authenticated users
+export const useSubscriptionGuard = (enabled: boolean = true) => {
   const navigate = useNavigate();
-  const { data: subscriptionData, isLoading, error } = useSubscriptionStatus();
+  const { data: subscriptionData, isLoading, error } = useSubscriptionStatus(enabled);
 
   const checkSubscription = (redirectPath?: string) => {
+    // If subscription check is disabled, always allow
+    if (!enabled) {
+      return { allowed: true, loading: false };
+    }
     if (isLoading) return { allowed: false, loading: true };
     
     if (error) {
@@ -102,9 +106,9 @@ export const useSubscriptionGuard = () => {
   return { checkSubscription, subscriptionData: subscriptionData?.data };
 };
 
-// Hook to calculate days left in trial/subscription
-export const useSubscriptionTimer = () => {
-  const { data: subscriptionData } = useSubscriptionStatus();
+// Hook to calculate days left in trial/subscription - only for authenticated users
+export const useSubscriptionTimer = (enabled: boolean = true) => {
+  const { data: subscriptionData } = useSubscriptionStatus(enabled);
 
   const getTimeLeft = () => {
     if (!subscriptionData?.data?.expiresAt) return null;
@@ -144,9 +148,9 @@ export const useSubscriptionTimer = () => {
   };
 };
 
-// Hook for trial expiry monitoring
-export const useTrialExpiryMonitor = () => {
-  const { timeLeft, subscriptionStatus } = useSubscriptionTimer();
+// Hook for trial expiry monitoring - only for authenticated users
+export const useTrialExpiryMonitor = (enabled: boolean = true) => {
+  const { timeLeft, subscriptionStatus } = enabled ? useSubscriptionTimer() : { timeLeft: null, subscriptionStatus: null };
   const navigate = useNavigate();
 
   const checkForExpiry = () => {

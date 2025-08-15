@@ -4,7 +4,6 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  UseGuards,
   Get,
   Request,
   HttpException,
@@ -29,7 +28,6 @@ import {
   RefreshTokenDto,
 } from '../dto/password-auth.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -178,7 +176,6 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current user profile',
@@ -207,7 +204,6 @@ export class AuthController {
   }
 
   @Post('signout')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -229,7 +225,6 @@ export class AuthController {
   }
 
   @Get('subscription-status')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -273,7 +268,6 @@ export class AuthController {
   }
 
   @Post('subscribe')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

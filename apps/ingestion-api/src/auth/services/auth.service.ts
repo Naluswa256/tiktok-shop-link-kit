@@ -586,6 +586,8 @@ export class AuthService implements AuthServiceInterface {
 
   async validateToken(token: string): Promise<JwtPayload> {
     try {
+      this.logger.debug('Starting token validation process');
+
       // Check cache first to avoid expensive verification
       const cachedValidation = this.getCachedTokenValidation(token);
       if (cachedValidation) {
@@ -594,32 +596,38 @@ export class AuthService implements AuthServiceInterface {
       }
 
       // Decode the token header to get the key ID (kid)
+      this.logger.debug('Decoding token header');
       const decodedHeader = jwt.decode(token, { complete: true });
 
       if (!decodedHeader || !decodedHeader.header || !decodedHeader.header.kid) {
+        this.logger.error('Invalid token: missing key ID');
         throw new Error('Invalid token: missing key ID');
       }
 
       // Get the signing key from Cognito's JWKS
+      this.logger.debug('Getting signing key from JWKS');
       const key = await this.getSigningKey(decodedHeader.header.kid);
 
       // Verify the token using the public key
+      this.logger.debug('Verifying token signature');
       const decoded = jwt.verify(token, key, {
         algorithms: ['RS256'],
       }) as any;
 
       // Validate token structure and claims
       if (!decoded || !decoded.sub) {
+        this.logger.error('Invalid token structure - missing sub');
         throw new Error('Invalid token structure');
       }
 
       // Perform additional security validations
+      this.logger.debug('Validating token claims');
       this.validateTokenClaims(decoded);
 
       const payload: JwtPayload = {
         sub: decoded.sub,
         preferred_username: decoded.username || decoded.preferred_username, // Use username as primary source
-        aud: decoded.aud,
+        client_id: decoded.client_id,
         iss: decoded.iss,
         exp: decoded.exp,
         iat: decoded.iat,
@@ -688,32 +696,47 @@ export class AuthService implements AuthServiceInterface {
    * Validate additional token claims for security
    */
   private validateTokenClaims(decoded: any): void {
+    this.logger.debug('Validating token claims', {
+      iss: decoded.iss,
+      client_id: decoded.client_id,
+      token_use: decoded.token_use,
+      exp: decoded.exp,
+      iat: decoded.iat,
+    });
+
     // Validate issuer
     const expectedIssuer = `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}`;
     if (decoded.iss !== expectedIssuer) {
+      this.logger.error(`Invalid issuer: expected ${expectedIssuer}, got ${decoded.iss}`);
       throw new Error(`Invalid issuer: expected ${expectedIssuer}, got ${decoded.iss}`);
     }
 
-    // Validate audience (client ID)
-    if (decoded.aud !== this.clientId) {
-      throw new Error(`Invalid audience: expected ${this.clientId}, got ${decoded.aud}`);
+    // Validate audience (client ID) - Cognito access tokens use client_id instead of aud
+    if (decoded.client_id !== this.clientId) {
+      this.logger.error(`Invalid client ID: expected ${this.clientId}, got ${decoded.client_id}`);
+      throw new Error(`Invalid client ID: expected ${this.clientId}, got ${decoded.client_id}`);
     }
 
     // Validate token use
     if (decoded.token_use !== 'access') {
+      this.logger.error(`Invalid token use: expected 'access', got ${decoded.token_use}`);
       throw new Error(`Invalid token use: expected 'access', got ${decoded.token_use}`);
     }
 
     // Validate expiration
     const now = Math.floor(Date.now() / 1000);
     if (!decoded.exp || decoded.exp < now) {
+      this.logger.error(`Token has expired: exp=${decoded.exp}, now=${now}`);
       throw new Error('Token has expired');
     }
 
     // Validate issued at time (not too far in the future)
     if (decoded.iat && decoded.iat > now + 300) { // 5 minutes tolerance
+      this.logger.error(`Token issued in the future: iat=${decoded.iat}, now=${now}`);
       throw new Error('Token issued in the future');
     }
+
+    this.logger.debug('All token claims validated successfully');
   }
 
   async revokeToken(token: string): Promise<void> {

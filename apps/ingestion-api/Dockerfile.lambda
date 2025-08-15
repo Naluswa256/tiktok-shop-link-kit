@@ -16,5 +16,8 @@ RUN npm run build
 # Remove dev dependencies after build
 RUN npm prune --production
 
+# Create a simple index.js entry point
+RUN echo 'const { handler } = require("./dist/ingestion/handlers/scheduled-ingestion.handler"); exports.handler = handler;' > index.js
+
 # Set the CMD to the Lambda handler
-CMD [ "dist/ingestion/handlers/scheduled-ingestion.handler" ]
+CMD [ "index.handler" ]

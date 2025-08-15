@@ -22,7 +22,7 @@ import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { DynamoDBService } from '../database/dynamodb.service';
 import { AssembledProduct } from '../events/types';
 import { ResponseInterceptor } from '../common/interceptors/response.interceptor';
-import { GetShopProductsDto, GetProductDto } from './dto/get-shop-products.dto';
+import { GetShopProductsParamsDto, GetShopProductsQueryDto, GetProductDto } from './dto/get-shop-products.dto';
 import {
   ProductDto,
   ShopProductsResponseDto,
@@ -94,8 +94,8 @@ export class ProductsController {
     },
   })
   async getShopProducts(
-    @Param() params: GetShopProductsDto,
-    @Query() query: GetShopProductsDto,
+    @Param() params: GetShopProductsParamsDto,
+    @Query() query: GetShopProductsQueryDto,
   ): Promise<ShopProductsResponseDto> {
     const { handle } = params;
     const { limit, lastKey, since } = query;

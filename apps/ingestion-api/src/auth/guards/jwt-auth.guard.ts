@@ -28,7 +28,13 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
+    // Check if route is marked as admin public
+    const isAdminPublic = this.reflector.getAllAndOverride<boolean>('isAdminPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic || isAdminPublic) {
       return true;
     }
 
@@ -42,20 +48,26 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       // Validate token with Cognito
+      this.logger.debug('Starting token validation');
       const payload = await this.authService.validateToken(token);
-      
+      this.logger.debug('Token validation successful', { sub: payload.sub, preferred_username: payload.preferred_username });
+
       // Get user from database - try by Cognito ID first, then by handle
+      this.logger.debug(`Looking up user by Cognito ID: ${payload.sub}`);
       let user = await this.userRepository.getUserByCognitoId(payload.sub);
 
       // For password-based auth, also try to find by handle if not found by Cognito ID
       if (!user && payload.preferred_username) {
+        this.logger.debug(`User not found by Cognito ID, trying handle: ${payload.preferred_username}`);
         user = await this.userRepository.getUserByHandle(payload.preferred_username);
       }
 
       if (!user) {
-        this.logger.warn(`User not found for Cognito ID: ${payload.sub}`);
+        this.logger.warn(`User not found for Cognito ID: ${payload.sub} and handle: ${payload.preferred_username}`);
         throw new UnauthorizedException('User not found');
       }
+
+      this.logger.debug('User found successfully', { userId: user.userId, handle: user.handle });
 
       // Attach user and token to request
       const authenticatedUser: AuthenticatedUser = {

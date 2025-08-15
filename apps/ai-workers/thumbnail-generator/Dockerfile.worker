@@ -19,8 +19,10 @@ COPY requirements.txt ./
 # Install Node.js dependencies
 RUN npm install --only=production
 
-# Install Python dependencies
-RUN pip3 install -r requirements.txt
+# Install Python dependencies in smaller batches to avoid filesystem issues
+RUN pip3 install --no-cache-dir boto3 python-dotenv pydantic requests
+RUN pip3 install --no-cache-dir fastapi uvicorn aws-lambda-powertools
+RUN pip3 install --no-cache-dir pillow numpy ffmpeg-python structlog
 
 # Copy source code
 COPY . .
@@ -49,9 +51,11 @@ RUN groupadd -g 1001 nodejs && \
 # Set working directory
 WORKDIR /app
 
-# Copy Python requirements and install
+# Copy Python requirements and install in batches
 COPY requirements.txt ./
-RUN pip3 install -r requirements.txt
+RUN pip3 install --no-cache-dir boto3 python-dotenv pydantic requests
+RUN pip3 install --no-cache-dir fastapi uvicorn aws-lambda-powertools
+RUN pip3 install --no-cache-dir pillow numpy ffmpeg-python structlog
 
 # Copy built application and dependencies
 COPY --from=builder --chown=worker:nodejs /app/dist ./dist

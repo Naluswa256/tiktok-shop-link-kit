@@ -2,7 +2,9 @@
 import { toast } from 'sonner';
 import {
   handleApiError as handleNetworkError,
-  retryWithBackoff
+  retryWithBackoff,
+  isNetworkError,
+  showNetworkErrorToast
 } from './networkErrorHandler';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
@@ -557,7 +559,7 @@ export const shopApi = {
 
 // Product API functions
 export const productApi = {
-  // Get products for a shop - GET /shop/:handle/products
+  // Get products for a shop - GET /api/v1/shop/:handle/products (routed to product service)
   getShopProducts: async (
     handle: string,
     options?: {
@@ -572,7 +574,7 @@ export const productApi = {
     if (options?.since) params.append('since', options.since);
 
     const queryString = params.toString();
-    const endpoint = `/shop/${handle}/products${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/v1/shop/${handle}/products${queryString ? `?${queryString}` : ''}`;
 
     return apiRequest<ProductsResponse>(endpoint, {
       method: 'GET',
@@ -610,11 +612,33 @@ export const subscriptionApi = {
   },
 };
 
-// Helper function to handle API errors with toast notifications
-export const handleApiError = (error: unknown, fallbackMessage = 'Something went wrong') => {
-  const message = error instanceof Error ? error.message : fallbackMessage;
-  toast.error(message);
+// Enhanced error handling function that preserves backend error messages
+export const handleApiError = (error: any, fallbackMessage = 'Something went wrong') => {
   console.error('API Error:', error);
+
+  let errorMessage = fallbackMessage;
+
+  // Try to extract backend error message in order of preference
+  if (error?.response?.data?.message) {
+    // Backend API response message (most preferred)
+    errorMessage = error.response.data.message;
+  } else if (error?.data?.message) {
+    // Alternative backend message format
+    errorMessage = error.data.message;
+  } else if (error?.message) {
+    // Error object message
+    errorMessage = error.message;
+  } else if (typeof error === 'string') {
+    // String error
+    errorMessage = error;
+  }
+
+  // Handle network errors with user-friendly messages
+  if (isNetworkError(error)) {
+    showNetworkErrorToast(error, errorMessage);
+  } else {
+    toast.error(errorMessage);
+  }
 };
 
 // Helper function to convert backend error messages to user-friendly messages

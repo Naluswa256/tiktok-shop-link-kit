@@ -19,8 +19,7 @@ export class EventProcessorService {
   private readonly logger = new Logger(EventProcessorService.name);
   private readonly sqsClient: SQSClient;
   private readonly snsClient: SNSClient;
-  private readonly captionQueueUrl: string;
-  private readonly thumbnailQueueUrl: string;
+  private readonly productAssemblyQueueUrl: string;
   private readonly newProductTopicArn: string;
   private isProcessing = false;
 
@@ -37,13 +36,12 @@ export class EventProcessorService {
       region: this.configService.get('AWS_REGION', 'us-east-1'),
     });
 
-    this.captionQueueUrl = this.configService.get('SQS_CAPTION_QUEUE_URL', '');
-    this.thumbnailQueueUrl = this.configService.get('SQS_THUMBNAIL_QUEUE_URL', '');
+    this.productAssemblyQueueUrl = this.configService.get('SQS_QUEUE_URL', '');
     this.newProductTopicArn = this.configService.get('SNS_TOPIC_ARN', '');
   }
 
   /**
-   * Start processing events from both SQS queues
+   * Start processing events from the product assembly queue
    */
   async startProcessing(): Promise<void> {
     if (this.isProcessing) {
@@ -52,13 +50,10 @@ export class EventProcessorService {
     }
 
     this.isProcessing = true;
-    this.logger.log('Starting event processing for product assembly');
+    this.logger.log('Starting event processing for product assembly queue');
 
-    // Start processing both queues concurrently
-    Promise.all([
-      this.processCaptionQueue(),
-      this.processThumbnailQueue(),
-    ]).catch((error) => {
+    // Start processing the unified product assembly queue
+    this.processProductAssemblyQueue().catch((error) => {
       this.logger.error('Error in event processing', { error: error.message });
       this.isProcessing = false;
     });
@@ -73,68 +68,95 @@ export class EventProcessorService {
   }
 
   /**
-   * Process caption parsed events
+   * Process events from the unified product assembly queue
    */
-  private async processCaptionQueue(): Promise<void> {
+  private async processProductAssemblyQueue(): Promise<void> {
     while (this.isProcessing) {
       try {
-        const messages = await this.receiveMessages(this.captionQueueUrl);
-        
+        const messages = await this.receiveMessages(this.productAssemblyQueueUrl);
+
         if (messages.length === 0) {
           await this.sleep(5000); // Wait 5 seconds before polling again
           continue;
         }
 
-        this.logger.debug(`Processing ${messages.length} caption messages`);
+        this.logger.debug(`Processing ${messages.length} product assembly messages`);
 
         for (const message of messages) {
           try {
-            await this.processCaptionMessage(message);
-            await this.deleteMessage(this.captionQueueUrl, message);
+            await this.processMessage(message);
+            await this.deleteMessage(this.productAssemblyQueueUrl, message);
           } catch (error) {
-            this.logger.error('Failed to process caption message', {
+            this.logger.error('Failed to process product assembly message', {
               messageId: message.MessageId,
               error: error.message,
             });
           }
         }
       } catch (error) {
-        this.logger.error('Error in caption queue processing', { error: error.message });
+        this.logger.error('Error in product assembly queue processing', { error: error.message });
         await this.sleep(10000); // Wait longer on error
       }
     }
   }
 
   /**
-   * Process thumbnail generated events
+   * Process a single message and route to appropriate handler based on event type
    */
-  private async processThumbnailQueue(): Promise<void> {
-    while (this.isProcessing) {
-      try {
-        const messages = await this.receiveMessages(this.thumbnailQueueUrl);
-        
-        if (messages.length === 0) {
-          await this.sleep(5000); // Wait 5 seconds before polling again
-          continue;
-        }
+  private async processMessage(message: SQSMessage): Promise<EventProcessingResult> {
+    try {
+      // Parse SNS notification to get message attributes and content
+      const snsNotification = JSON.parse(message.Body);
 
-        this.logger.debug(`Processing ${messages.length} thumbnail messages`);
+      // Check if it's an SNS notification
+      if (snsNotification.Type === 'Notification' && snsNotification.MessageAttributes) {
+        const eventType = snsNotification.MessageAttributes?.eventType?.Value;
 
-        for (const message of messages) {
-          try {
-            await this.processThumbnailMessage(message);
-            await this.deleteMessage(this.thumbnailQueueUrl, message);
-          } catch (error) {
-            this.logger.error('Failed to process thumbnail message', {
-              messageId: message.MessageId,
-              error: error.message,
-            });
-          }
+        this.logger.debug('Processing message with event type', {
+          eventType,
+          messageId: message.MessageId
+        });
+
+        // Route to appropriate handler based on event type
+        switch (eventType) {
+          case 'CaptionParsed':
+            return await this.processCaptionMessage(message);
+          case 'ThumbnailGenerated':
+            return await this.processThumbnailMessage(message);
+          case 'VideoPosted':
+            // Skip VideoPosted events - they're for AI workers, not product assembly
+            this.logger.debug('Skipping VideoPosted event in product assembly queue');
+            return {
+              success: true,
+              message_id: message.MessageId,
+              event_type: 'video_posted_skipped',
+              processing_time_ms: 0
+            };
+          default:
+            this.logger.warn(`Unknown event type: ${eventType}, attempting content-based detection`);
+            // Fall through to content-based detection
         }
-      } catch (error) {
-        this.logger.error('Error in thumbnail queue processing', { error: error.message });
-        await this.sleep(10000); // Wait longer on error
+      } else {
+        // Fallback: try to detect event type from message content
+        const messageContent = snsNotification.Message ? JSON.parse(snsNotification.Message) : snsNotification;
+
+        if (messageContent.title !== undefined && messageContent.raw_caption !== undefined) {
+          // Looks like a caption parsed event
+          return await this.processCaptionMessage(message);
+        } else if (messageContent.thumbnails && Array.isArray(messageContent.thumbnails)) {
+          // Looks like a thumbnail generated event
+          return await this.processThumbnailMessage(message);
+        } else {
+          throw new Error('Unable to determine event type from message content');
+        }
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Failed to process message', {
+        messageId: message.MessageId,
+        error: errorMessage
+      });
+      throw error;
     }
   }
 
@@ -143,9 +165,9 @@ export class EventProcessorService {
    */
   private async processCaptionMessage(message: SQSMessage): Promise<EventProcessingResult> {
     const startTime = Date.now();
-    
+
     try {
-      const captionEvent: CaptionParsedEvent = JSON.parse(message.Body);
+      const captionEvent: CaptionParsedEvent = this.parseEventFromSNS(message.Body, 'CaptionParsedEvent');
       
       this.logger.debug('Processing caption event', {
         videoId: captionEvent.video_id,
@@ -205,9 +227,9 @@ export class EventProcessorService {
    */
   private async processThumbnailMessage(message: SQSMessage): Promise<EventProcessingResult> {
     const startTime = Date.now();
-    
+
     try {
-      const thumbnailEvent: ThumbnailGeneratedEvent = JSON.parse(message.Body);
+      const thumbnailEvent: ThumbnailGeneratedEvent = this.parseEventFromSNS(message.Body, 'ThumbnailGeneratedEvent');
       
       this.logger.debug('Processing thumbnail event', {
         videoId: thumbnailEvent.video_id,
@@ -398,6 +420,50 @@ export class EventProcessorService {
   /**
    * Sleep utility
    */
+  private parseEventFromSNS<T>(messageBody: string, eventType: string): T {
+    try {
+      // First, try to parse as direct event (for backward compatibility)
+      const directEvent = JSON.parse(messageBody);
+
+      // Check if it's already the expected event type (has required fields)
+      if (this.isValidEvent(directEvent, eventType)) {
+        return directEvent as T;
+      }
+
+      // Check if it's an SNS notification wrapper
+      if (directEvent.Type === 'Notification' && directEvent.Message) {
+        // Parse the inner Message field
+        const innerMessage = JSON.parse(directEvent.Message);
+
+        // Validate it's the expected event type
+        if (this.isValidEvent(innerMessage, eventType)) {
+          return innerMessage as T;
+        }
+      }
+
+      throw new Error(`Message does not contain valid ${eventType} data`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      this.logger.error(`Failed to parse ${eventType} from message`, {
+        error: errorMessage,
+        messageBody: messageBody.substring(0, 200) + '...' // Log first 200 chars for debugging
+      });
+      throw new Error(`Failed to parse ${eventType}: ${errorMessage}`);
+    }
+  }
+
+  private isValidEvent(event: any, eventType: string): boolean {
+    switch (eventType) {
+      case 'CaptionParsedEvent':
+        return event.video_id && event.seller_handle && event.title !== undefined;
+      case 'ThumbnailGeneratedEvent':
+        return event.video_id && event.seller_handle && event.thumbnails && Array.isArray(event.thumbnails);
+      default:
+        return false;
+    }
+  }
+
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

@@ -20,7 +20,7 @@ variable "user_pool_domain" {
 variable "username_attributes" {
   description = "Attributes used as username"
   type        = list(string)
-  default     = ["email"]
+  default     = [] # Allow any username format (not just email)
 }
 
 variable "alias_attributes" {

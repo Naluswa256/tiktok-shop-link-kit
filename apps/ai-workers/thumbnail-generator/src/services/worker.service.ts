@@ -149,8 +149,8 @@ export class ThumbnailGeneratorWorker {
         throw new Error('Message body is empty');
       }
 
-      // Parse the video posted event
-      const videoEvent: VideoPostedEvent = JSON.parse(message.Body);
+      // Parse the video posted event from SNS notification
+      const videoEvent: VideoPostedEvent = this.parseVideoEventFromSNS(message.Body);
       
       this.logger.info('Processing video for thumbnail generation', {
         videoId: videoEvent.video_id,
@@ -390,6 +390,61 @@ export class ThumbnailGeneratorWorker {
         error: errorMessage
       });
       throw error;
+    }
+  }
+
+  private parseVideoEventFromSNS(messageBody: string): VideoPostedEvent {
+    try {
+      this.logger.debug('Parsing message body', {
+        messageBody: messageBody.substring(0, 300) + '...'
+      });
+
+      // First, try to parse as direct VideoPostedEvent (for backward compatibility)
+      const directEvent = JSON.parse(messageBody);
+
+      this.logger.debug('Parsed direct event', {
+        hasVideoId: !!directEvent.video_id,
+        hasVideoUrl: !!directEvent.video_url,
+        hasSellerHandle: !!directEvent.seller_handle,
+        hasCaption: !!directEvent.caption,
+        type: directEvent.Type
+      });
+
+      // Check if it's already a VideoPostedEvent
+      if (directEvent.video_id && directEvent.video_url && directEvent.seller_handle) {
+        this.logger.debug('Found direct VideoPostedEvent');
+        return directEvent as VideoPostedEvent;
+      }
+
+      // Check if it's an SNS notification wrapper
+      if (directEvent.Type === 'Notification' && directEvent.Message) {
+        this.logger.debug('Found SNS notification, parsing inner message');
+        // Parse the inner Message field
+        const innerMessage = JSON.parse(directEvent.Message);
+
+        this.logger.debug('Parsed inner message', {
+          hasVideoId: !!innerMessage.video_id,
+          hasVideoUrl: !!innerMessage.video_url,
+          hasSellerHandle: !!innerMessage.seller_handle,
+          hasCaption: !!innerMessage.caption
+        });
+
+        // Validate it's a VideoPostedEvent
+        if (innerMessage.video_id && innerMessage.video_url && innerMessage.seller_handle) {
+          this.logger.debug('Found valid VideoPostedEvent in SNS message');
+          return innerMessage as VideoPostedEvent;
+        }
+      }
+
+      throw new Error('Message does not contain valid VideoPostedEvent data');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      this.logger.error('Failed to parse video event from message', {
+        error: errorMessage,
+        messageBody: messageBody.substring(0, 200) + '...' // Log first 200 chars for debugging
+      });
+      throw new Error(`Failed to parse video event: ${errorMessage}`);
     }
   }
 

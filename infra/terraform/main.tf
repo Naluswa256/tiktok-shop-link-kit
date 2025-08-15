@@ -239,7 +239,18 @@ module "sns_topics" {
       name         = "${local.name_prefix}-new-video-posted"
       display_name = "New Video Posted Events"
     }
+    caption_parsed = {
+      name         = "${local.name_prefix}-caption-parsed"
+      display_name = "Caption Parsed Events"
+    }
+    thumbnail_generated = {
+      name         = "${local.name_prefix}-thumbnail-generated"
+      display_name = "Thumbnail Generated Events"
+    }
   }
+
+  # Disable encryption to fix SNS->SQS delivery issues
+  enable_encryption = false
 
   tags = local.common_tags
 }
@@ -276,6 +287,7 @@ module "sqs_queues" {
 
   # SNS subscriptions
   sns_subscriptions = {
+    # AI workers receive new video events
     thumbnail_generation = {
       topic_arn = module.sns_topics.topic_arns["new_video_posted"]
       queue_name = "thumbnail_generation"
@@ -284,11 +296,19 @@ module "sqs_queues" {
       topic_arn = module.sns_topics.topic_arns["new_video_posted"]
       queue_name = "caption_parsing"
     }
-    product_assembly = {
-      topic_arn = module.sns_topics.topic_arns["new_video_posted"]
+    # Product assembly receives processed events from AI workers
+    product_assembly_caption = {
+      topic_arn = module.sns_topics.topic_arns["caption_parsed"]
+      queue_name = "product_assembly"
+    }
+    product_assembly_thumbnail = {
+      topic_arn = module.sns_topics.topic_arns["thumbnail_generated"]
       queue_name = "product_assembly"
     }
   }
+
+  # Disable encryption to fix SNS->SQS delivery issues
+  enable_encryption = false
 
   tags = local.common_tags
 }
@@ -413,11 +433,12 @@ module "ingestion_api_service" {
     NODE_ENV                       = var.environment == "prod" ? "production" : var.environment
     PORT                          = "3001"
     LOG_LEVEL                     = var.environment == "prod" ? "info" : "debug"
-    CORS_ORIGINS                  = join(",", var.cors_origins)
+    AWS_REGION                    = var.aws_region
+    ALLOWED_ORIGINS               = join(",", var.cors_origins)
     DYNAMODB_USERS_TABLE          = module.dynamodb_tables.table_names["users"]
     DYNAMODB_SHOPS_TABLE          = module.dynamodb_tables.table_names["shops"]
     DYNAMODB_PRODUCTS_TABLE       = module.dynamodb_tables.table_names["products"]
-    DYNAMODB_ADMIN_SESSIONS_TABLE = module.dynamodb_tables.table_names["admin_sessions"]
+    ADMIN_SESSIONS_TABLE = module.dynamodb_tables.table_names["admin_sessions"]
     DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_tables.table_names["ingestion_state"]
     SNS_NEW_VIDEO_POSTED_TOPIC_ARN = module.sns_topics.topic_arns["new_video_posted"]
     COGNITO_USER_POOL_ID          = module.cognito.user_pool_id
@@ -497,13 +518,11 @@ module "product_service" {
     NODE_ENV                    = var.environment == "prod" ? "production" : var.environment
     PORT                       = "3002"
     LOG_LEVEL                  = var.environment == "prod" ? "info" : "debug"
+    AWS_REGION                 = var.aws_region
     ALLOWED_ORIGINS            = join(",", var.cors_origins)
     DYNAMODB_PRODUCTS_TABLE    = module.dynamodb_tables.table_names["products"]
     DYNAMODB_STAGING_TABLE     = module.dynamodb_tables.table_names["staging"]
     SQS_QUEUE_URL              = module.sqs_queues.queue_urls["product_assembly"]
-    SQS_CAPTION_QUEUE_URL      = module.sqs_queues.queue_urls["caption_parsing"]
-    SQS_THUMBNAIL_QUEUE_URL    = module.sqs_queues.queue_urls["thumbnail_generation"]
-    SNS_TOPIC_ARN              = module.sns_topics.topic_arns["new_video_posted"]
   }
 
   # Auto scaling
@@ -568,7 +587,7 @@ module "thumbnail_generator_service" {
   environment_variables = {
     NODE_ENV                    = var.environment == "prod" ? "production" : var.environment
     SQS_QUEUE_URL               = module.sqs_queues.queue_urls["thumbnail_generation"]
-    SNS_TOPIC_ARN               = module.sns_topics.topic_arns["new_video_posted"]
+    SNS_TOPIC_ARN               = module.sns_topics.topic_arns["thumbnail_generated"]
     S3_BUCKET_NAME              = module.s3_buckets.bucket_names["thumbnails"]
     MAX_VIDEO_SIZE_MB           = "300"
     MAX_VIDEO_DURATION_SECONDS  = "3600"
@@ -639,7 +658,7 @@ module "caption_parser_service" {
   environment_variables = {
     NODE_ENV          = var.environment == "prod" ? "production" : var.environment
     SQS_QUEUE_URL     = module.sqs_queues.queue_urls["caption_parsing"]
-    SNS_TOPIC_ARN     = module.sns_topics.topic_arns["new_video_posted"]
+    SNS_TOPIC_ARN     = module.sns_topics.topic_arns["caption_parsed"]
     LLM_PROVIDER      = "openrouter"
     LLM_MODEL         = "microsoft/phi-3-mini-128k-instruct"
   }
@@ -734,6 +753,14 @@ module "parameter_store" {
       description = "SNS New Video Posted topic ARN"
       value       = module.sns_topics.topic_arns["new_video_posted"]
     }
+    "aws/sns/caption_parsed_topic_arn" = {
+      description = "SNS Caption Parsed topic ARN"
+      value       = module.sns_topics.topic_arns["caption_parsed"]
+    }
+    "aws/sns/thumbnail_generated_topic_arn" = {
+      description = "SNS Thumbnail Generated topic ARN"
+      value       = module.sns_topics.topic_arns["thumbnail_generated"]
+    }
 
     # SQS Queue URLs
     "aws/sqs/thumbnail_generation_queue_url" = {
@@ -812,6 +839,10 @@ module "eventbridge" {
   source = "./modules/eventbridge"
 
   name_prefix = local.name_prefix
+
+  # Schedule expressions (cron format: minute hour day month day-of-week year)
+  # Uganda time (EAT) is UTC+3, so 11:05 AM Uganda = 08:05 AM UTC
+  evening_schedule_expression = "cron(5 8 * * ? *)" # 08:05 AM UTC = 11:05 AM Uganda time
 
   # Lambda configuration
   create_lambda_function    = true

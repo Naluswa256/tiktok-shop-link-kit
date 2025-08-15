@@ -80,7 +80,7 @@ export class LLMService {
 You are an AI assistant that extracts product information from TikTok captions for e-commerce in Uganda.
 
 Extract the following information from this TikTok caption:
-- title: A concise product name (2-5 words describing what is being sold)
+- title: A concise product name (1-3 words describing the core product being sold)
 - price: Numeric price in UGX (Ugandan Shillings), return null if not found
 - sizes: Size/variant information if applicable (clothing sizes, phone storage, car model year, etc.), return null if not applicable
 - tags: Array of relevant product category tags (2-4 tags max), return empty array if unclear
@@ -89,7 +89,7 @@ Caption: "${caption}"
 
 This could be ANY type of product: electronics, vehicles, real estate, clothing, food, services, etc.
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON in this exact format (no markdown, no code blocks, no explanations):
 {
   "title": "Product Name",
   "price": 55000,
@@ -97,14 +97,25 @@ Respond ONLY with valid JSON in this exact format:
   "tags": ["category1", "category2"]
 }
 
-Rules:
+CRITICAL RULES FOR TITLE EXTRACTION:
+- IGNORE all hashtags (text starting with #) when extracting the product name
+- Focus on the core product noun (e.g., "shoes", "phone", "car", "house")
+- Avoid filler words like "being", "sold", "available", "for", "sale"
+- Extract only the essential product name, not descriptive phrases
+- If multiple products mentioned, pick the main/first one
+- Examples:
+  * "#Track shoes being sold size 45" → title: "shoes"
+  * "New iPhone 14 Pro available" → title: "iPhone 14 Pro"
+  * "#TRACK Toyota Camry 2018 model" → title: "Toyota Camry"
+  * "Fresh mangoes for sale" → title: "mangoes"
+
+OTHER RULES:
 - If price contains "k", multiply by 1000 (e.g., "55k" = 55000, "2.5k" = 2500)
 - If price contains "m", multiply by 1000000 (e.g., "1.2m" = 1200000)
-- Extract the main product being sold, ignore promotional words like "new", "hot", "deal"
 - For sizes: include any variant info (clothing sizes, phone storage, car year, house bedrooms, etc.)
 - For tags: use these main categories: electronics, vehicles, real-estate, clothing, food, beauty, home-garden, services
 - Use null for missing information, empty array [] for tags if unclear
-- No explanations, just JSON
+- Return ONLY the JSON object, no markdown formatting, no code blocks, no additional text
 
 Examples:
 - "New iPhone 14 Pro 256GB only 2.5m UGX" → {"title": "iPhone 14 Pro", "price": 2500000, "sizes": "256GB", "tags": ["electronics", "smartphone"]}
@@ -191,7 +202,7 @@ Examples:
         }
 
         this.logger.debug(`OpenRouter response received (attempt ${attempt}): ${content.substring(0, 100)}...`);
-        return JSON.parse(content);
+        return this.parseJSONFromContent(content);
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -218,6 +229,139 @@ Examples:
     }
 
     throw lastError || new Error('OpenRouter request failed after all retries');
+  }
+
+  private parseJSONFromContent(content: string): LLMResponse {
+    // First, try to parse as direct JSON
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      // If that fails, try to extract JSON from markdown code blocks
+      this.logger.debug('Direct JSON parsing failed, attempting to extract from markdown');
+
+      // Look for JSON wrapped in markdown code blocks
+      const jsonBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonBlockMatch) {
+        try {
+          return JSON.parse(jsonBlockMatch[1]);
+        } catch (error) {
+          this.logger.warn('Failed to parse JSON from markdown block');
+        }
+      }
+
+      // Look for any JSON object in the content
+      const jsonMatch = content.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch (error) {
+          this.logger.warn('Failed to parse extracted JSON object');
+        }
+      }
+
+      // If all else fails, throw the original error
+      throw new Error(`Unable to parse JSON from OpenRouter response: ${content.substring(0, 100)}...`);
+    }
+  }
+
+  /**
+   * Smart product name extraction using linguistic patterns and product knowledge
+   */
+  private extractProductName(words: string[]): string {
+    // Common product nouns that should be prioritized
+    const productNouns = [
+      // Electronics
+      'phone', 'iphone', 'samsung', 'laptop', 'computer', 'tablet', 'headphones', 'speaker',
+      'tv', 'television', 'camera', 'watch', 'smartwatch', 'charger', 'cable',
+
+      // Vehicles
+      'car', 'truck', 'motorcycle', 'bike', 'bicycle', 'toyota', 'honda', 'nissan',
+      'mercedes', 'bmw', 'audi', 'volkswagen', 'hyundai', 'kia', 'mazda',
+
+      // Clothing & Fashion
+      'shoes', 'sneakers', 'boots', 'sandals', 'shirt', 'dress', 'pants', 'jeans',
+      'jacket', 'coat', 'hat', 'bag', 'handbag', 'backpack', 'watch', 'jewelry',
+
+      // Home & Garden
+      'sofa', 'chair', 'table', 'bed', 'mattress', 'fridge', 'refrigerator',
+      'microwave', 'oven', 'washing', 'machine', 'fan', 'ac', 'conditioner',
+
+      // Food & Beverages
+      'rice', 'beans', 'maize', 'flour', 'sugar', 'oil', 'meat', 'fish',
+      'chicken', 'beef', 'pork', 'vegetables', 'fruits', 'mangoes', 'bananas',
+
+      // Beauty & Health
+      'cream', 'lotion', 'soap', 'shampoo', 'perfume', 'makeup', 'lipstick',
+      'powder', 'medicine', 'drugs', 'vitamins', 'supplements'
+    ];
+
+    // Brand names that should be included with product
+    const brands = [
+      'apple', 'samsung', 'huawei', 'xiaomi', 'oppo', 'vivo', 'tecno', 'infinix',
+      'toyota', 'honda', 'nissan', 'mercedes', 'bmw', 'audi', 'volkswagen',
+      'nike', 'adidas', 'puma', 'gucci', 'prada', 'louis', 'vuitton'
+    ];
+
+    const lowerWords = words.map(w => w.toLowerCase());
+
+    // Strategy 1: Look for brand + product combinations
+    for (let i = 0; i < lowerWords.length - 1; i++) {
+      const word1 = lowerWords[i];
+      const word2 = lowerWords[i + 1];
+
+      if (brands.includes(word1) && productNouns.includes(word2)) {
+        return `${words[i]} ${words[i + 1]}`;
+      }
+      if (productNouns.includes(word1) && brands.includes(word2)) {
+        return `${words[i]} ${words[i + 1]}`;
+      }
+    }
+
+    // Strategy 2: Look for specific product patterns (iPhone 14, Galaxy S23, etc.)
+    for (let i = 0; i < lowerWords.length - 1; i++) {
+      const word1 = lowerWords[i];
+      const word2 = lowerWords[i + 1];
+
+      // iPhone/Galaxy + model number
+      if ((word1 === 'iphone' || word1 === 'galaxy') && /^\d+/.test(word2)) {
+        return i + 2 < words.length && words[i + 2].toLowerCase() === 'pro'
+          ? `${words[i]} ${words[i + 1]} ${words[i + 2]}`
+          : `${words[i]} ${words[i + 1]}`;
+      }
+
+      // Car model + year (Toyota Camry, Honda Civic, etc.)
+      if (brands.includes(word1) && i + 2 < lowerWords.length && /^\d{4}$/.test(lowerWords[i + 2])) {
+        return `${words[i]} ${words[i + 1]}`;
+      }
+    }
+
+    // Strategy 3: Find the first strong product noun
+    for (let i = 0; i < lowerWords.length; i++) {
+      if (productNouns.includes(lowerWords[i])) {
+        // Check if next word is a model/variant
+        if (i + 1 < words.length) {
+          const nextWord = lowerWords[i + 1];
+          if (/^\d+/.test(nextWord) || ['pro', 'plus', 'max', 'mini', 'air'].includes(nextWord)) {
+            return `${words[i]} ${words[i + 1]}`;
+          }
+        }
+        return words[i];
+      }
+    }
+
+    // Strategy 4: Fallback - take first 1-2 meaningful words
+    if (words.length >= 2) {
+      // Avoid common filler combinations
+      const word1 = lowerWords[0];
+
+      if (['track', 'new', 'fresh', 'hot', 'best', 'good', 'nice'].includes(word1)) {
+        return words[1]; // Skip the filler word
+      }
+
+      return `${words[0]} ${words[1]}`;
+    }
+
+    return words[0] || 'Product';
   }
 
   private sleep(ms: number): Promise<void> {
@@ -400,22 +544,26 @@ Examples:
 
     this.logger.debug(`Category classification for "${caption}": ${categoryTags.join(', ')}`);
 
-    // Generate a simple title by extracting meaningful words
+    // Generate a smart title by extracting the core product name
     let title = 'Product';
-    const words = caption.split(/\s+/).filter(word => {
+
+    // First, remove hashtags and clean the caption
+    const cleanCaption = caption.replace(/#\w+/g, '').trim();
+
+    // Extract meaningful product words with enhanced filtering
+    const words = cleanCaption.split(/\s+/).filter(word => {
       const cleanWord = word.replace(/[^\w]/g, '').toLowerCase();
       return cleanWord.length > 2 &&
-             !cleanWord.startsWith('#') &&
              !cleanWord.startsWith('@') &&
              !/^\d+[km]?$/.test(cleanWord) &&
-             !['only', 'new', 'available', 'sizes', 'price', 'ugx', 'shillings', 'call', 'contact', 'dm'].includes(cleanWord);
+             !['being', 'sold', 'available', 'for', 'sale', 'only', 'new', 'hot', 'deal',
+               'sizes', 'size', 'price', 'ugx', 'shillings', 'call', 'contact', 'dm',
+               'selling', 'buy', 'purchase', 'get', 'order', 'now', 'today'].includes(cleanWord);
     });
 
     if (words.length > 0) {
-      // Take first 2-3 meaningful words
-      title = words.slice(0, Math.min(3, words.length)).join(' ');
-      // Clean up title
-      title = title.replace(/[^\w\s]/g, '').trim();
+      // Use smart product name extraction
+      title = this.extractProductName(words);
     }
 
     return {

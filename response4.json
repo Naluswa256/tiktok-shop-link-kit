@@ -1,0 +1,1 @@
+{"statusCode":200,"body":"{\"success\":true,\"message\":\"Ingestion job completed successfully\",\"results\":{\"processed\":3,\"errors\":0,\"skipped\":0},\"duration\":\"53143ms\",\"timestamp\":\"2025-08-14T09:40:30.356Z\"}"}

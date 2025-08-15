@@ -276,8 +276,9 @@ export class IngestionService {
       const result = await this.dynamoClient.send(
         new ScanCommand({
           TableName: this.shopsTableName,
-          FilterExpression: 'subscription_status IN (:trial, :paid)',
+          FilterExpression: 'EntityType = :entityType AND subscription_status IN (:trial, :paid)',
           ExpressionAttributeValues: marshall({
+            ':entityType': 'SHOP',
             ':trial': 'trial',
             ':paid': 'paid',
           }),
@@ -288,7 +289,16 @@ export class IngestionService {
         return [];
       }
 
-      return result.Items.map(item => unmarshall(item) as Shop);
+      return result.Items.map(item => {
+        const unmarshalled = unmarshall(item);
+        // Map DynamoDB structure to Shop interface
+        return {
+          handle: unmarshalled.handle,
+          phone: unmarshalled.phone || '',
+          subscription_status: unmarshalled.subscription_status,
+          created_at: unmarshalled.created_at,
+        } as Shop;
+      });
     } catch (error) {
       this.logger.error('Failed to get active shops', error);
       throw error;
@@ -365,7 +375,10 @@ export class IngestionService {
       const result = await this.dynamoClient.send(
         new GetItemCommand({
           TableName: this.ingestionStateTableName,
-          Key: marshall({ handle }),
+          Key: marshall({
+            PK: `INGESTION#${handle}`,
+            SK: `STATE#${handle}`,
+          }),
         })
       );
 
@@ -386,7 +399,7 @@ export class IngestionService {
     additionalData: Partial<IngestionState> = {}
   ): Promise<void> {
     const now = new Date().toISOString();
-    
+
     const state: IngestionState = {
       handle,
       last_run: now,
@@ -396,11 +409,18 @@ export class IngestionService {
       ...additionalData,
     };
 
+    // Create DynamoDB item with proper PK/SK structure
+    const dynamoItem = {
+      PK: `INGESTION#${handle}`,
+      SK: `STATE#${handle}`,
+      ...state,
+    };
+
     try {
       await this.dynamoClient.send(
         new PutItemCommand({
           TableName: this.ingestionStateTableName,
-          Item: marshall(state),
+          Item: marshall(dynamoItem, { removeUndefinedValues: true }),
         })
       );
     } catch (error) {

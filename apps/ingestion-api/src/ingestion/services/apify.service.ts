@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SecretsService } from '../../common/services/secrets.service';
 
 export interface TikTokVideo {
   id: string;
@@ -40,7 +41,7 @@ export interface ApifyUsageStats {
 @Injectable()
 export class ApifyService {
   private readonly logger = new Logger(ApifyService.name);
-  private readonly apifyToken: string;
+  private apifyToken: string;
   private readonly actorId: string;
   private readonly baseUrl = 'https://api.apify.com/v2';
   
@@ -49,12 +50,34 @@ export class ApifyService {
   private lastResetDate = new Date().toDateString();
   private readonly maxDailyUsage = 300; // Conservative limit for free tier (10k CU/month ≈ 333 CU/day)
 
-  constructor(private readonly configService: ConfigService) {
-    this.apifyToken = this.configService.get('APIFY_TOKEN', '');
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly secretsService: SecretsService,
+  ) {
     this.actorId = this.configService.get('APIFY_ACTOR_ID', 'clockworks/tiktok-profile-scraper');
-    
-    if (!this.apifyToken) {
-      this.logger.warn('APIFY_TOKEN not configured - Apify service will not work');
+    // Token will be loaded asynchronously when needed
+  }
+
+  /**
+   * Load the Apify token from Secrets Manager or environment variable
+   */
+  private async loadApifyToken(): Promise<string> {
+    if (this.apifyToken) {
+      return this.apifyToken;
+    }
+
+    try {
+      const token = await this.secretsService.getApifyToken();
+      if (!token) {
+        throw new Error('Apify token not found in secrets or environment variables');
+      }
+
+      this.apifyToken = token;
+      this.logger.log('Apify token loaded successfully');
+      return token;
+    } catch (error) {
+      this.logger.error('Failed to load Apify token:', error);
+      throw new Error('Apify token not configured - Apify service will not work');
     }
   }
 
@@ -62,9 +85,8 @@ export class ApifyService {
    * Extract TikTok videos for a given handle
    */
   async extractVideos(handle: string, maxVideos: number = 20): Promise<ApifyRunResult> {
-    if (!this.apifyToken) {
-      throw new Error('Apify token not configured');
-    }
+    // Load the Apify token if not already loaded
+    await this.loadApifyToken();
 
     // Check daily usage limits
     this.checkDailyUsage();
@@ -86,7 +108,10 @@ export class ApifyService {
       this.logger.log(`Starting Apify extraction for handle: ${handle}`);
       
       // Start the actor run
-      const runResponse = await this.makeApifyRequest('POST', `/acts/${this.actorId}/runs`, {
+      const encodedActorId = encodeURIComponent(this.actorId);
+      this.logger.log(`Making request to: /acts/${encodedActorId}/runs`);
+      this.logger.log(`Actor ID: ${this.actorId}, Encoded: ${encodedActorId}`);
+      const runResponse = await this.makeApifyRequest('POST', `/acts/${encodedActorId}/runs`, {
         body: JSON.stringify(runInput),
       });
 

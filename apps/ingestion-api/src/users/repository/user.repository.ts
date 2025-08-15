@@ -175,12 +175,13 @@ export class UserRepository implements UserRepositoryInterface {
   async getUserByCognitoId(cognitoUserId: string): Promise<User | null> {
     try {
       const result = await this.dynamoClient.send(
-        new QueryCommand({
+        new ScanCommand({
           TableName: this.tableName,
           FilterExpression: 'cognitoUserId = :cognitoUserId',
           ExpressionAttributeValues: marshall({
             ':cognitoUserId': cognitoUserId,
           }),
+          Limit: 1,
         })
       );
 

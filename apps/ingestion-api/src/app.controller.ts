@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
+import { Public } from './auth/guards/jwt-auth.guard';
 
 @ApiTags('app')
 @Controller()
@@ -8,6 +9,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get API information' })
   @ApiResponse({ status: 200, description: 'API information retrieved successfully' })
   getHello(): string {
@@ -15,6 +17,7 @@ export class AppController {
   }
 
   @Get('health')
+  @Public()
   @ApiOperation({ summary: 'Health check endpoint for ALB' })
   @ApiResponse({ status: 200, description: 'Service is healthy' })
   getHealth(): { status: string; timestamp: string } {

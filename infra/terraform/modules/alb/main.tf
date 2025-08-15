@@ -127,7 +127,26 @@ resource "aws_lb_listener_rule" "ingestion_api" {
 
   condition {
     path_pattern {
-      values = ["/api/v1/ingestion/*", "/api/v1/auth/*", "/api/v1/admin/*", "/api/v1/shops/*", "/api/v1/users/*"]
+      values = ["/api/v1/ingestion/*", "/api/v1/auth/*", "/api/v1/admin/*", "/api/v1/shop/*", "/api/v1/users/*"]
+    }
+  }
+
+  tags = var.tags
+}
+
+# Admin endpoints (separate rule due to ALB 5-value limit)
+resource "aws_lb_listener_rule" "admin" {
+  listener_arn = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
+  priority     = 150
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ingestion_api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/admin/*"]
     }
   }
 
@@ -145,7 +164,12 @@ resource "aws_lb_listener_rule" "product_service" {
 
   condition {
     path_pattern {
-      values = ["/api/v1/products/*"]
+      values = [
+        "/api/v1/products/*",
+        "/api/v1/shop/*/products*",
+        "/products/*",
+        "/socket.io/*"
+      ]
     }
   }
 

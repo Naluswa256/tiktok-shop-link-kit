@@ -34,8 +34,10 @@ const Shop = () => {
   const { data: productsData, isLoading: productsLoading, error: productsError } = useShopProducts(shopHandle);
   const { status: wsStatus } = useProductUpdates(isOwner ? shopHandle : null);
 
-  const { isExpired, isWarning, timeLeft, subscriptionStatus } = useTrialExpiryMonitor();
-  const { formatTimeLeft } = useSubscriptionTimer();
+  // Only check subscription for authenticated shop owners
+  const shouldCheckSubscription = isAuthenticated && isOwner;
+  const { isExpired, isWarning, timeLeft, subscriptionStatus } = useTrialExpiryMonitor(shouldCheckSubscription);
+  const { formatTimeLeft } = useSubscriptionTimer(shouldCheckSubscription);
 
   const products = productsData?.data?.products || [];
   const hasProducts = products.length > 0;

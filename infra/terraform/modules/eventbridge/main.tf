@@ -14,7 +14,7 @@ resource "aws_cloudwatch_event_rule" "scheduled_ingestion_morning" {
 
 resource "aws_cloudwatch_event_rule" "scheduled_ingestion_evening" {
   name                = "${var.name_prefix}-scheduled-ingestion-evening"
-  description         = "Trigger scheduled ingestion at 6:00 PM UTC daily"
+  description         = "Trigger scheduled ingestion at 11:05 AM Uganda time (08:05 AM UTC) daily"
   schedule_expression = var.evening_schedule_expression
 
   tags = merge(var.tags, {
@@ -107,7 +107,7 @@ resource "aws_cloudwatch_event_target" "lambda_evening" {
 
   input = jsonencode({
     schedule = "evening"
-    time     = "18:00"
+    time     = "11:05" # 11:05 AM Uganda time (EAT)
   })
 }
 
@@ -183,7 +183,7 @@ resource "aws_cloudwatch_event_target" "ecs_evening" {
 
   input = jsonencode({
     schedule = "evening"
-    time     = "18:00"
+    time     = "11:05" # 11:05 AM Uganda time (EAT)
   })
 }
 

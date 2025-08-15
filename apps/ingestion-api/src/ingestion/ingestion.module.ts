@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { IngestionService as ScheduledIngestionService } from './services/ingestion.service';
 import { ApifyService } from './services/apify.service';
 import { MonitoringService } from './services/monitoring.service';
+import { SecretsService } from '../common/services/secrets.service';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { MonitoringService } from './services/monitoring.service';
     ScheduledIngestionService,
     ApifyService,
     MonitoringService,
+    SecretsService,
   ],
   exports: [
     ScheduledIngestionService,

@@ -19,7 +19,12 @@ interface ClientSubscription {
 
 @WSGateway({
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:8080'], // Add your frontend URLs
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:8080',
+      'https://buylink.app',
+      'https://www.buylink.app'
+    ],
     credentials: true,
   },
   namespace: '/products',
@@ -200,7 +205,7 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   private unsubscribeClientFromAll(clientId: string): void {
     for (const [sellerHandle, clients] of this.subscriptions.entries()) {
       const updatedClients = clients.filter(c => c.socketId !== clientId);
-      
+
       if (updatedClients.length === 0) {
         this.subscriptions.delete(sellerHandle);
       } else {
@@ -208,14 +213,18 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     }
 
-    // Leave all socket rooms
-    const client = this.server.sockets.sockets.get(clientId);
-    if (client) {
-      client.rooms.forEach(room => {
-        if (room.startsWith('seller:')) {
-          client.leave(room);
-        }
-      });
+    // Leave all socket rooms - check if server is initialized
+    if (this.server && this.server.sockets && this.server.sockets.sockets) {
+      const client = this.server.sockets.sockets.get(clientId);
+      if (client) {
+        client.rooms.forEach(room => {
+          if (room.startsWith('seller:')) {
+            client.leave(room);
+          }
+        });
+      }
+    } else {
+      this.logger.warn(`Cannot access server.sockets for client ${clientId} - server not initialized`);
     }
   }
 

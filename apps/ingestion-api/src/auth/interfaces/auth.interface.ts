@@ -35,7 +35,7 @@ export interface JwtPayload {
   phone_number?: string;
   preferred_username?: string; // TikTok handle for password-based auth
   'custom:tiktok_handle'?: string; // Legacy SMS-based auth
-  aud: string; // Client ID
+  client_id: string; // Client ID (Cognito access tokens use client_id instead of aud)
   iss: string; // Issuer
   exp: number; // Expiration
   iat: number; // Issued at

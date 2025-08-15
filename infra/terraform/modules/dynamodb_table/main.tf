@@ -77,9 +77,10 @@ resource "aws_dynamodb_table" "tables" {
     Name = each.value.name
   })
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Commented out for development - uncomment for production
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 # Auto Scaling for PROVISIONED tables

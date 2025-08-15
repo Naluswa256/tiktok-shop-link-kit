@@ -143,14 +143,14 @@ export class CaptionParserWorker {
 
   private async processMessage(message: { Body?: string; ReceiptHandle: string; MessageId?: string }): Promise<ProcessingResult> {
     const startTime = Date.now();
-    
+
     try {
       if (!message.Body) {
         throw new Error('Message body is empty');
       }
 
-      // Parse the video posted event
-      const videoEvent: VideoPostedEvent = JSON.parse(message.Body);
+      // Parse the video posted event from SNS notification
+      const videoEvent: VideoPostedEvent = this.parseVideoEventFromSNS(message.Body);
       
       this.logger.info('Processing video caption', {
         videoId: videoEvent.video_id,
@@ -279,6 +279,39 @@ export class CaptionParserWorker {
         error: errorMessage
       });
       throw error;
+    }
+  }
+
+  private parseVideoEventFromSNS(messageBody: string): VideoPostedEvent {
+    try {
+      // First, try to parse as direct VideoPostedEvent (for backward compatibility)
+      const directEvent = JSON.parse(messageBody);
+
+      // Check if it's already a VideoPostedEvent
+      if (directEvent.video_id && directEvent.caption && directEvent.seller_handle) {
+        return directEvent as VideoPostedEvent;
+      }
+
+      // Check if it's an SNS notification wrapper
+      if (directEvent.Type === 'Notification' && directEvent.Message) {
+        // Parse the inner Message field
+        const innerMessage = JSON.parse(directEvent.Message);
+
+        // Validate it's a VideoPostedEvent
+        if (innerMessage.video_id && innerMessage.caption && innerMessage.seller_handle) {
+          return innerMessage as VideoPostedEvent;
+        }
+      }
+
+      throw new Error('Message does not contain valid VideoPostedEvent data');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      this.logger.error('Failed to parse video event from message', {
+        error: errorMessage,
+        messageBody: messageBody.substring(0, 200) + '...' // Log first 200 chars for debugging
+      });
+      throw new Error(`Failed to parse video event: ${errorMessage}`);
     }
   }
 

@@ -47,8 +47,8 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({
 }) => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const location = useLocation();
-  const { checkSubscription } = useSubscriptionGuard();
-  const { isExpired, handleExpiry } = useTrialExpiryMonitor();
+  const { checkSubscription } = useSubscriptionGuard(requireAuth && isAuthenticated);
+  const { isExpired, handleExpiry } = useTrialExpiryMonitor(requireAuth && isAuthenticated);
 
   // Check for trial expiry in real-time
   useEffect(() => {

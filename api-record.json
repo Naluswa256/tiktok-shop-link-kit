@@ -1,0 +1,17 @@
+{
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "buylink.app",
+        "Type": "A",
+        "ResourceRecords": [
+          {
+            "Value": "216.150.1.1"
+          }
+        ],
+        "TTL": 300
+      }
+    }
+  ]
+}

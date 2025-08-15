@@ -559,7 +559,7 @@ export const shopApi = {
 
 // Product API functions
 export const productApi = {
-  // Get products for a shop - GET /api/v1/shop/:handle/products (routed to product service)
+  // Get products for a shop - GET /shop/:handle/products (routed to product service via ALB)
   getShopProducts: async (
     handle: string,
     options?: {
@@ -574,7 +574,7 @@ export const productApi = {
     if (options?.since) params.append('since', options.since);
 
     const queryString = params.toString();
-    const endpoint = `/api/v1/shop/${handle}/products${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/shop/${handle}/products${queryString ? `?${queryString}` : ''}`;
 
     return apiRequest<ProductsResponse>(endpoint, {
       method: 'GET',

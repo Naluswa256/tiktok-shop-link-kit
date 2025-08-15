@@ -134,6 +134,14 @@ export class ShopController {
   ): Promise<ApiResponseDto<any>> {
     const requestingUser = req.user;
 
+    // Debug logging
+    console.log('Shop owner request:', {
+      requestedHandle: handle,
+      userHandle: requestingUser?.handle,
+      userId: requestingUser?.userId,
+      user: requestingUser
+    });
+
     // Check if the requesting user owns this shop
     if (requestingUser.handle !== handle) {
       return ApiResponseDto.error('Access denied - you can only view your own shop details', 'ACCESS_DENIED');

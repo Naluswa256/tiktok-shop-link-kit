@@ -88,7 +88,14 @@ variable "cognito_logout_urls" {
 variable "cors_origins" {
   description = "Allowed CORS origins"
   type        = list(string)
-  default     = ["https://buylink.ug", "https://www.buylink.ug", "https://admin.buylink.ug"]
+  default     = [
+    "https://buylink.app",
+    "https://www.buylink.app",
+    "https://admin.buylink.app",
+    "https://buylink.ug",
+    "https://www.buylink.ug",
+    "https://admin.buylink.ug"
+  ]
 }
 
 # Application Configuration

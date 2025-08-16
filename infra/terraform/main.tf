@@ -336,6 +336,7 @@ module "s3_buckets" {
   buckets = {
     thumbnails = {
       name = "${local.name_prefix}-thumbnails"
+      public_read_access = true  # Allow public read access for thumbnails
 
       # Lifecycle configuration for cost optimization
       lifecycle_rules = [

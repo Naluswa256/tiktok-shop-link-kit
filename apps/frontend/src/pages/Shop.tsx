@@ -6,6 +6,7 @@ import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubscriptionPrompt } from '@/components/SubscriptionPrompt';
 import { TrialExpiryModal } from '@/components/SubscriptionGuard';
+import { WhatsAppPrompt, useWhatsAppPrompt } from '@/components/WhatsAppPrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { shopApi, ShopData } from '@/lib/api';
@@ -26,9 +27,13 @@ const Shop = () => {
   const [loading, setLoading] = useState(true);
   const [viewCount, setViewCount] = useState<number>(0);
   const [isFirstTimeSignup, setIsFirstTimeSignup] = useState(false);
+  const [sellerWhatsAppNumber, setSellerWhatsAppNumber] = useState<string | null>(null);
 
   const shopHandle = handle || 'unknown';
   const isOwner = isAuthenticated && (user?.tiktokHandle === shopHandle || user?.shopHandle === shopHandle);
+
+  // WhatsApp prompt state
+  const { isOpen: isWhatsAppPromptOpen, openPrompt: openWhatsAppPrompt, closePrompt: closeWhatsAppPrompt } = useWhatsAppPrompt();
 
   // Hooks for real-time features
   const { data: productsData, isLoading: productsLoading, error: productsError } = useShopProducts(shopHandle);
@@ -275,17 +280,30 @@ const Shop = () => {
               </div>
             </div>
 
-            {/* TikTok Profile Link */}
-            <div className="pt-2">
+            {/* Action Buttons */}
+            <div className="pt-2 space-y-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.open(`https://tiktok.com/@${shopHandle}`, '_blank')}
-                className="gap-2 text-xs"
+                className="gap-2 text-xs w-full"
               >
                 <Video className="w-3 h-3" />
                 View TikTok Profile
               </Button>
+
+              {/* WhatsApp Setup Prompt for Shop Owner */}
+              {isOwner && !shopData?.phoneNumber && !sellerWhatsAppNumber && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openWhatsAppPrompt('modal')}
+                  className="gap-2 text-xs w-full border-primary/50 text-primary hover:bg-primary/5"
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  Add WhatsApp for Customer Contact
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -487,17 +505,31 @@ const Shop = () => {
                             src={product.primary_thumbnail.thumbnail_url}
                             alt={product.title}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback for broken images
+                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE2MS4zIDEwMCAxMzAgMTMxLjMgMTMwIDE3MFMxNjEuMyAyNDAgMjAwIDI0MFMyNzAgMjA4LjcgMjcwIDE3MFMyMzguNyAxMDAgMjAwIDEwMFpNMjAwIDIxMEMxNzcuOSAyMTAgMTYwIDE5Mi4xIDE2MCAxNzBTMTc3LjkgMTMwIDIwMCAxMzBTMjQwIDE0Ny45IDI0MCAxNzBTMjIyLjEgMjEwIDIwMCAyMTBaIiBmaWxsPSIjOUI5QkEzIi8+CjxwYXRoIGQ9Ik0zMDAgMzAwSDEwMFYzMzBIMzAwVjMwMFoiIGZpbGw9IiM5QjlCQTMiLz4KPC9zdmc+';
+                            }}
                           />
                         </div>
                         <div className="p-3 space-y-2">
                           <h4 className="text-sm font-medium text-foreground line-clamp-2">
                             {product.title}
                           </h4>
-                          {product.price && (
-                            <p className="text-sm font-semibold text-primary">
-                              UGX {product.price.toLocaleString()}
-                            </p>
-                          )}
+
+                          {/* Price Display */}
+                          <div className="space-y-1">
+                            {product.price ? (
+                              <p className="text-sm font-semibold text-primary">
+                                UGX {product.price.toLocaleString()}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">
+                                DM seller for price
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Tags */}
                           {product.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {product.tags.slice(0, 2).map((tag) => (
@@ -510,6 +542,34 @@ const Shop = () => {
                               ))}
                             </div>
                           )}
+
+                          {/* WhatsApp Contact Button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 text-xs"
+                            onClick={() => {
+                              const message = `Hi! I'm interested in your product: ${product.title}`;
+                              const phoneNumber = shopData?.phoneNumber || sellerWhatsAppNumber;
+
+                              if (phoneNumber) {
+                                // Use seller's WhatsApp number
+                                const whatsappUrl = `https://wa.me/${phoneNumber.replace('+', '')}?text=${encodeURIComponent(message)}`;
+                                window.open(whatsappUrl, '_blank');
+                              } else if (isOwner) {
+                                // Show prompt for owner to add WhatsApp number
+                                openWhatsAppPrompt('modal');
+                              } else {
+                                // Fallback: open WhatsApp with just the message
+                                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message + ` - Contact @${shopHandle} for more details`)}`;
+                                window.open(whatsappUrl, '_blank');
+                                toast.info('Seller hasn\'t added their WhatsApp number yet. You can still share this message!');
+                              }
+                            }}
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            Contact Seller on WhatsApp
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -575,6 +635,17 @@ const Shop = () => {
       }}
       timeLeft={formatTimeLeft}
     />
+
+    {/* WhatsApp Prompt Modal */}
+    {isWhatsAppPromptOpen && (
+      <WhatsAppPrompt
+        onClose={closeWhatsAppPrompt}
+        onSuccess={(phoneNumber) => {
+          setSellerWhatsAppNumber(phoneNumber);
+          toast.success('WhatsApp number added! Customers can now contact you directly.');
+        }}
+      />
+    )}
   </>
   );
 };

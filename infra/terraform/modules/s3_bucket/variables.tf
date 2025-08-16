@@ -6,6 +6,7 @@ variable "buckets" {
     name                        = string
     versioning                 = optional(bool, false)
     enable_intelligent_tiering  = optional(bool, false)
+    public_read_access         = optional(bool, false)
     
     lifecycle_rules = optional(list(object({
       id     = string

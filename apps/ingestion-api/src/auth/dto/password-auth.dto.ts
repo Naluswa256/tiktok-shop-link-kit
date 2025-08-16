@@ -59,6 +59,30 @@ export class RefreshTokenDto {
   refreshToken: string;
 }
 
+export class UpdateProfileDto {
+  @ApiProperty({
+    description: 'WhatsApp phone number for customer contact',
+    example: '+256700123456',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\+[1-9]\d{1,14}$/, {
+    message: 'Phone number must be in international format (e.g., +256700123456)',
+  })
+  phoneNumber?: string;
+
+  @ApiProperty({
+    description: 'Display name for the shop',
+    example: 'Nalu Fashion Store',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50, { message: 'Display name must be at most 50 characters long' })
+  displayName?: string;
+}
+
 export class ValidateHandleDto {
   @ApiProperty({
     description: 'TikTok handle to validate (without @)',

@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input } from '@/components/tiktok-commerce';
-import { ArrowRight, ArrowLeft, Check, AtSign, ExternalLink, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, AtSign, ExternalLink, Loader2, CheckCircle, XCircle, Eye, EyeOff, MessageCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuthFlow } from '@/hooks/useAuth';
-import { cleanTikTokHandle } from '@/lib/api';
+import { cleanTikTokHandle, authApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { isPasswordValid } from '@/lib/password-validation';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -20,11 +21,13 @@ interface ValidationState {
 
 export const SignupFlow = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [formData, setFormData] = useState({
     tiktokHandle: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    whatsappNumber: ''
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -88,6 +91,29 @@ export const SignupFlow = () => {
       } catch (error) {
         // Error is handled by the hook
       }
+    } else if (currentStep === 3) {
+      // Optional WhatsApp number step
+      if (formData.whatsappNumber.trim()) {
+        // Validate phone number format
+        const phoneRegex = /^\+[1-9]\d{1,14}$/;
+        if (!phoneRegex.test(formData.whatsappNumber)) {
+          toast.error('Please enter a valid WhatsApp number in international format (e.g., +256700123456)');
+          return;
+        }
+
+        // Update user profile with WhatsApp number
+        try {
+          if (token) {
+            await authApi.updateProfile(token, {
+              phoneNumber: formData.whatsappNumber
+            });
+            toast.success('WhatsApp number added successfully!');
+          }
+        } catch (error) {
+          toast.error('Failed to save WhatsApp number, but you can add it later');
+        }
+      }
+      setCurrentStep(4);
     }
   };
 
@@ -136,7 +162,8 @@ export const SignupFlow = () => {
                formData.confirmPassword.length >= 8 &&
                formData.password === formData.confirmPassword;
       case 3:
-        return true; // Success step
+        // WhatsApp step - always valid (optional field)
+        return true;
       default:
         return false;
     }
@@ -149,7 +176,7 @@ export const SignupFlow = () => {
       case 2:
         return passwordSignup.isPending ? 'Creating Account...' : 'Create Account';
       case 3:
-        return 'Visit Your Shop';
+        return formData.whatsappNumber.trim() ? 'Save & Continue' : 'Skip for Now';
       default:
         return 'Continue';
     }
@@ -194,7 +221,7 @@ export const SignupFlow = () => {
         <CardContent className="p-lg space-y-lg">
           {/* Progress Indicator */}
           <div className="flex items-center justify-between">
-            {[1, 2, 3].map((step) => (
+            {[1, 2, 3, 4].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
@@ -207,9 +234,9 @@ export const SignupFlow = () => {
                 >
                   {step < currentStep ? <Check className="w-4 h-4" /> : step}
                 </div>
-                {step < 3 && (
+                {step < 4 && (
                   <div
-                    className={`w-12 h-0.5 mx-2 transition-colors ${
+                    className={`w-8 h-0.5 mx-1 transition-colors ${
                       step < currentStep ? 'bg-success' : 'bg-muted'
                     }`}
                   />
@@ -341,6 +368,41 @@ export const SignupFlow = () => {
             {currentStep === 3 && (
               <div className="space-y-md">
                 <div className="text-center space-y-sm">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                    <MessageCircle className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold">Add WhatsApp Number (Optional)</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Let customers contact you directly about your products
+                  </p>
+                </div>
+
+                <div className="space-y-md">
+                  <Input
+                    label="WhatsApp Number"
+                    placeholder="+256700123456"
+                    value={formData.whatsappNumber}
+                    onChange={(e) => handleInputChange('whatsappNumber', e.target.value)}
+                    helper="Include country code (e.g., +256 for Uganda)"
+                  />
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">💡 Why add WhatsApp?</p>
+                      <ul className="text-xs space-y-1">
+                        <li>• Customers can contact you directly about products</li>
+                        <li>• Increase sales with instant communication</li>
+                        <li>• You can always add this later in your profile</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 4 && (
+              <div className="space-y-md">
+                <div className="text-center space-y-sm">
                   <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto">
                     <CheckCircle className="w-6 h-6 text-success" />
                   </div>
@@ -391,7 +453,7 @@ export const SignupFlow = () => {
           </div>
 
           {/* Navigation */}
-          {currentStep < 3 && (
+          {currentStep < 4 && (
             <div className="flex justify-between items-center pt-md">
               <Button
                 variant="ghost"

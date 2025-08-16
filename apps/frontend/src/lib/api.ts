@@ -30,6 +30,22 @@ export interface ValidateHandleResponse {
   requestId: string;
 }
 
+export interface UserProfileData {
+  userId: string;
+  handle: string;
+  phoneNumber?: string;
+  displayName?: string;
+  subscriptionStatus: string;
+}
+
+export interface UserProfileResponse {
+  success: boolean;
+  data: UserProfileData;
+  message: string;
+  timestamp: string;
+  requestId: string;
+}
+
 // Password-based authentication types
 export interface PasswordSignupRequest {
   handle: string;
@@ -504,6 +520,33 @@ export const authApi = {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
+    });
+  },
+
+  // Get current user profile - GET /auth/me (requires auth token)
+  getCurrentUser: async (token: string): Promise<UserProfileResponse> => {
+    return apiRequest<UserProfileResponse>('/auth/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  // Update user profile - PUT /auth/me (requires auth token)
+  updateProfile: async (
+    token: string,
+    updates: {
+      phoneNumber?: string;
+      displayName?: string;
+    }
+  ): Promise<UserProfileResponse> => {
+    return apiRequest<UserProfileResponse>('/auth/me', {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(updates),
     });
   },
 };

@@ -40,6 +40,7 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserInput {
+  phoneNumber?: string;  // Add phone number for WhatsApp contact
   profilePhotoUrl?: string;
   displayName?: string;
   followerCount?: number;

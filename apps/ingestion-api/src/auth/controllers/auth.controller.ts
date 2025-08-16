@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Body,
   HttpCode,
   HttpStatus,
@@ -26,6 +27,7 @@ import {
   ValidateHandleDto as PasswordValidateHandleDto,
   HandleValidationResponseDto as PasswordHandleValidationResponseDto,
   RefreshTokenDto,
+  UpdateProfileDto,
 } from '../dto/password-auth.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -191,15 +193,60 @@ export class AuthController {
   })
   async getCurrentUser(@Request() req: any): Promise<ApiResponseDto<any>> {
     const user = req.user;
-    
+
     return ApiResponseDto.success(
       {
         userId: user.userId,
         handle: user.handle,
         phoneNumber: user.phoneNumber,
+        displayName: user.displayName,
         subscriptionStatus: user.subscriptionStatus,
       },
       'User profile retrieved successfully'
+    );
+  }
+
+  @Put('me')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description: 'Updates the authenticated user profile information',
+  })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile updated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+  })
+  async updateCurrentUser(
+    @Request() req: any,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ): Promise<ApiResponseDto<any>> {
+    const user = req.user;
+
+    // Update user in database
+    const updatedUser = await this.userRepository.updateUser(user.userId, {
+      phoneNumber: updateProfileDto.phoneNumber,
+      displayName: updateProfileDto.displayName,
+    });
+
+    return ApiResponseDto.success(
+      {
+        userId: updatedUser.userId,
+        handle: updatedUser.handle,
+        phoneNumber: updatedUser.phoneNumber,
+        displayName: updatedUser.displayName,
+        subscriptionStatus: updatedUser.subscriptionStatus,
+      },
+      'User profile updated successfully'
     );
   }
 

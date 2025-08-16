@@ -43,10 +43,11 @@ resource "aws_s3_bucket_public_access_block" "buckets" {
 
   bucket = aws_s3_bucket.buckets[each.key].id
 
-  block_public_acls       = var.block_public_access
-  block_public_policy     = var.block_public_access
-  ignore_public_acls      = var.block_public_access
-  restrict_public_buckets = var.block_public_access
+  # Allow public access if public_read_access is true for this bucket
+  block_public_acls       = try(each.value.public_read_access, false) ? false : var.block_public_access
+  block_public_policy     = try(each.value.public_read_access, false) ? false : var.block_public_access
+  ignore_public_acls      = try(each.value.public_read_access, false) ? false : var.block_public_access
+  restrict_public_buckets = try(each.value.public_read_access, false) ? false : var.block_public_access
 }
 
 # S3 Bucket Lifecycle Configuration
@@ -114,6 +115,31 @@ resource "aws_s3_bucket_lifecycle_configuration" "buckets" {
   }
 
   depends_on = [aws_s3_bucket_versioning.buckets]
+}
+
+# S3 Bucket Policy for Public Read Access
+resource "aws_s3_bucket_policy" "public_read" {
+  for_each = {
+    for k, v in var.buckets : k => v
+    if try(v.public_read_access, false)
+  }
+
+  bucket = aws_s3_bucket.buckets[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.buckets[each.key].arn}/*"
+      }
+    ]
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.buckets]
 }
 
 # S3 Bucket CORS Configuration

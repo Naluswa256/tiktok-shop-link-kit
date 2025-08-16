@@ -54,13 +54,13 @@ export const useUpdateProductCache = () => {
           ...oldData,
           data: {
             ...oldData.data,
-            products: [newProduct, ...oldData.data.products],
-            pagination: {
-              ...oldData.data.pagination,
-              count: oldData.data.pagination.count + 1,
-            },
-            metadata: {
-              ...oldData.data.metadata,
+            data: [newProduct, ...oldData.data.data],  // Backend uses data.data array
+            meta: {
+              ...oldData.data.meta,
+              pagination: {
+                ...oldData.data.meta.pagination,
+                count: oldData.data.meta.pagination.count + 1,
+              },
               timestamp: new Date().toISOString(),
             },
           },
@@ -99,7 +99,7 @@ export const useShopProductsPagination = (handle: string) => {
 
   const loadMore = async (lastKey: string) => {
     const newData = await productApi.getShopProducts(handle, { lastKey });
-    
+
     // Merge with existing data
     queryClient.setQueryData(
       productKeys.shopProducts(handle),
@@ -110,7 +110,7 @@ export const useShopProductsPagination = (handle: string) => {
           ...newData,
           data: {
             ...newData.data,
-            products: [...oldData.data.products, ...newData.data.products],
+            data: [...oldData.data.data, ...newData.data.data],  // Backend uses data.data array
           },
         };
       }

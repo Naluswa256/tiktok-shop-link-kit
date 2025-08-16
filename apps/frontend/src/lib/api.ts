@@ -267,17 +267,22 @@ export interface AssembledProduct {
 }
 
 export interface ShopProductsResponse {
-  products: AssembledProduct[];
-  pagination: {
-    hasMore: boolean;
-    lastEvaluatedKey: string | null;
-    count: number;
-  };
-  metadata: {
+  data: AssembledProduct[];  // Products array directly
+  meta: {
+    performance: {
+      responseTime: number;
+    };
+    pagination: {
+      hasMore: boolean;
+      lastEvaluatedKey: string | null;
+      count: number;
+    };
     sellerHandle: string;
     since: string | null;
     timestamp: string;
   };
+  timestamp: string;
+  path: string;
 }
 
 // Subscription-related types

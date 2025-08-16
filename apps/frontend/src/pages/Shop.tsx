@@ -39,7 +39,7 @@ const Shop = () => {
   const { isExpired, isWarning, timeLeft, subscriptionStatus } = useTrialExpiryMonitor(shouldCheckSubscription);
   const { formatTimeLeft } = useSubscriptionTimer(shouldCheckSubscription);
 
-  const products = productsData?.data?.products || [];
+  const products = productsData?.data?.data || [];  // Backend returns data.data array
   const hasProducts = products.length > 0;
   const hasActiveSubscription = subscriptionStatus?.status === 'trial' || subscriptionStatus?.status === 'paid';
 
@@ -455,14 +455,14 @@ const Shop = () => {
           </Card>
         )}
 
-        {/* Products Section */}
-        {hasActiveSubscription && (
+        {/* Products Section - Always visible for public viewing */}
+        {hasProducts && (
           <Card>
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">Products</h3>
-                  {isOwner && wsStatus.connected && (
+                  {isOwner && wsStatus.connected && hasActiveSubscription && (
                     <div className="flex items-center gap-2 text-xs text-success">
                       <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                       Live updates

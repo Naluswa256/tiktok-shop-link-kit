@@ -499,12 +499,16 @@ const Shop = () => {
                 ) : hasProducts ? (
                   <div className="grid grid-cols-2 gap-4">
                     {products.map((product) => (
-                      <div key={product.video_id} className="border rounded-lg overflow-hidden">
+                      <div
+                        key={product.video_id}
+                        className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => navigate(`/product/${shopHandle}/${product.video_id}`)}
+                      >
                         <div className="aspect-square bg-muted">
                           <img
                             src={product.primary_thumbnail.thumbnail_url}
                             alt={product.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover hover:scale-105 transition-transform"
                             onError={(e) => {
                               // Fallback for broken images
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE2MS4zIDEwMCAxMzAgMTMxLjMgMTMwIDE3MFMxNjEuMyAyNDAgMjAwIDI0MFMyNzAgMjA4LjcgMjcwIDE3MFMyMzguNyAxMDAgMjAwIDEwMFpNMjAwIDIxMEMxNzcuOSAyMTAgMTYwIDE5Mi4xIDE2MCAxNzBTMTc3LjkgMTMwIDIwMCAxMzBTMjQwIDE0Ny45IDI0MCAxNzBTMjIyLjEgMjEwIDIwMCAyMTBaIiBmaWxsPSIjOUI5QkEzIi8+CjxwYXRoIGQ9Ik0zMDAgMzAwSDEwMFYzMzBIMzAwVjMwMFoiIGZpbGw9IiM5QjlCQTMiLz4KPC9zdmc+';
@@ -548,27 +552,31 @@ const Shop = () => {
                             variant="outline"
                             size="sm"
                             className="w-full gap-2 text-xs"
-                            onClick={() => {
-                              const message = `Hi! I'm interested in your product: ${product.title}`;
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering product navigation
+                              const productUrl = `${window.location.origin}/product/${shopHandle}/${product.video_id}`;
+                              const message = `Hi! I'm interested in this product:\n\n📦 *${product.title}*\n${product.price ? `💰 UGX ${product.price.toLocaleString()}` : '💬 Price on request'}\n\n🔗 View product: ${productUrl}\n\nCan you tell me more about it?`;
                               const phoneNumber = shopData?.phoneNumber || sellerWhatsAppNumber;
 
                               if (phoneNumber) {
-                                // Use seller's WhatsApp number
-                                const whatsappUrl = `https://wa.me/${phoneNumber.replace('+', '')}?text=${encodeURIComponent(message)}`;
+                                // Use seller's WhatsApp number and send message directly
+                                const whatsappUrl = `https://api.whatsapp.com/send?phone=${phoneNumber.replace('+', '')}&text=${encodeURIComponent(message)}`;
                                 window.open(whatsappUrl, '_blank');
                               } else if (isOwner) {
                                 // Show prompt for owner to add WhatsApp number
                                 openWhatsAppPrompt('modal');
                               } else {
                                 // Fallback: open WhatsApp with just the message
-                                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message + ` - Contact @${shopHandle} for more details`)}`;
+                                const fallbackMessage = `${message}\n\nContact @${shopHandle} for more details`;
+                                const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fallbackMessage)}`;
                                 window.open(whatsappUrl, '_blank');
                                 toast.info('Seller hasn\'t added their WhatsApp number yet. You can still share this message!');
                               }
                             }}
                           >
                             <MessageCircle className="w-3 h-3" />
-                            Contact Seller on WhatsApp
+                            <span className="hidden sm:inline">Contact Seller on WhatsApp</span>
+                            <span className="sm:hidden">WhatsApp</span>
                           </Button>
                         </div>
                       </div>

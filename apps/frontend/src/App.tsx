@@ -13,6 +13,7 @@ import Subscription from "./pages/Subscription";
 import Login from "./pages/Login";
 import Shop from "./pages/Shop";
 import ProductCatalog from "./pages/ProductCatalog";
+import ProductDetail from "./pages/ProductDetail";
 import SellerDashboard from "./pages/SellerDashboard";
 import SignupSuccess from "./pages/SignupSuccess";
 import NotFound from "./pages/NotFound";
@@ -45,6 +46,14 @@ const App = () => (
                   }
                 />
                 <Route path="/catalog/:handle" element={<ProductCatalog />} />
+                <Route
+                  path="/product/:handle/:videoId"
+                  element={
+                    <ProtectedRoute requireAuth={false} requireSubscription={false}>
+                      <ProductDetail />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/dashboard"
                   element={

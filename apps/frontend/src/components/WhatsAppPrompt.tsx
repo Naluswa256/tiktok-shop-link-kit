@@ -85,10 +85,10 @@ export const WhatsAppPrompt = ({ onClose, onSuccess, trigger = 'modal' }: WhatsA
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">💡 Benefits:</p>
             <ul className="text-xs space-y-1">
-              <li>• Direct customer communication</li>
-              <li>• Faster response times</li>
-              <li>• Increased sales conversion</li>
-              <li>• Build customer relationships</li>
+              <li>• Direct customer communication with product links</li>
+              <li>• Customers can share specific products easily</li>
+              <li>• Faster response times and sales conversion</li>
+              <li>• Build stronger customer relationships</li>
             </ul>
           </div>
         </div>

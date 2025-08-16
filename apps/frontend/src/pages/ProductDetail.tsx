@@ -97,15 +97,15 @@ const ProductDetail = () => {
   };
 
   const nextImage = () => {
-    if (!product?.thumbnails) return;
-    setCurrentImageIndex((prev) => 
+    if (!product?.thumbnails || product.thumbnails.length <= 1) return;
+    setCurrentImageIndex((prev) =>
       prev === product.thumbnails.length - 1 ? 0 : prev + 1
     );
   };
 
   const prevImage = () => {
-    if (!product?.thumbnails) return;
-    setCurrentImageIndex((prev) => 
+    if (!product?.thumbnails || product.thumbnails.length <= 1) return;
+    setCurrentImageIndex((prev) =>
       prev === 0 ? product.thumbnails.length - 1 : prev - 1
     );
   };
@@ -155,6 +155,7 @@ const ProductDetail = () => {
   }
 
   const currentThumbnail = product.thumbnails?.[currentImageIndex] || product.primary_thumbnail;
+  const thumbnailUrl = currentThumbnail?.thumbnail_url || '';
 
   return (
     <>
@@ -176,39 +177,48 @@ const ProductDetail = () => {
           <Card>
             <CardContent className="p-0">
               <div className="relative aspect-square bg-muted">
-                <img
-                  src={currentThumbnail.thumbnail_url}
-                  alt={product.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE2MS4zIDEwMCAxMzAgMTMxLjMgMTMwIDE3MFMxNjEuMyAyNDAgMjAwIDI0MFMyNzAgMjA4LjcgMjcwIDE3MFMyMzguNyAxMDAgMjAwIDEwMFpNMjAwIDIxMEMxNzcuOSAyMTAgMTYwIDE5Mi4xIDE2MCAxNzBTMTc3LjkgMTMwIDIwMCAxMzBTMjQwIDE0Ny45IDI0MCAxNzBTMjIyLjEgMjEwIDIwMCAyMTBaIiBmaWxsPSIjOUI5QkEzIi8+CjxwYXRoIGQ9Ik0zMDAgMzAwSDEwMFYzMzBIMzAwVjMwMFoiIGZpbGw9IiM5QjlCQTMiLz4KPC9zdmc+';
-                  }}
-                  onClick={nextImage}
-                />
+                {thumbnailUrl ? (
+                  <img
+                    src={thumbnailUrl}
+                    alt={product.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE2MS4zIDEwMCAxMzAgMTMxLjMgMTMwIDE3MFMxNjEuMyAyNDAgMjAwIDI0MFMyNzAgMjA4LjcgMjcwIDE3MFMyMzguNyAxMDAgMjAwIDEwMFpNMjAwIDIxMEMxNzcuOSAyMTAgMTYwIDE5Mi4xIDE2MCAxNzBTMTc3LjkgMTMwIDIwMCAxMzBTMjQwIDE0Ny45IDI0MCAxNzBTMjIyLjEgMjEwIDIwMCAyMTBaIiBmaWxsPSIjOUI5QkEzIi8+CjxwYXRoIGQ9Ik0zMDAgMzAwSDEwMFYzMzBIMzAwVjMwMFoiIGZpbGw9IiM5QjlCQTMiLz4KPC9zdmc+';
+                    }}
+                    onClick={nextImage}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                    <div className="text-center text-muted-foreground">
+                      <Video className="w-12 h-12 mx-auto mb-2" />
+                      <p className="text-sm">No image available</p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Image Navigation */}
-                {product.thumbnails && product.thumbnails.length > 1 && (
+                {product.thumbnails && product.thumbnails.length > 1 && thumbnailUrl && (
                   <>
                     <button
                       onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4 rotate-180" />
                     </button>
-                    
+
                     {/* Image Indicators */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                       {product.thumbnails.map((_, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2 h-2 rounded-full ${
+                          className={`w-2 h-2 rounded-full transition-colors ${
                             index === currentImageIndex ? 'bg-white' : 'bg-white/50'
                           }`}
                         />

@@ -116,6 +116,30 @@ resource "aws_lb_target_group" "product_service" {
 }
 
 # Listener Rules for path-based routing
+# Product service rule has higher priority (lower number) to catch product endpoints first
+resource "aws_lb_listener_rule" "product_service" {
+  listener_arn = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
+  priority     = 90
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.product_service.arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/products/*",
+        "/api/v1/shop/*/products*",
+        "/products/*",
+        "/socket.io/*"
+      ]
+    }
+  }
+
+  tags = var.tags
+}
+
 resource "aws_lb_listener_rule" "ingestion_api" {
   listener_arn = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   priority     = 100
@@ -153,25 +177,4 @@ resource "aws_lb_listener_rule" "admin" {
   tags = var.tags
 }
 
-resource "aws_lb_listener_rule" "product_service" {
-  listener_arn = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
-  priority     = 200
 
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.product_service.arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/products/*",
-        "/api/v1/shop/*/products*",
-        "/products/*",
-        "/socket.io/*"
-      ]
-    }
-  }
-
-  tags = var.tags
-}

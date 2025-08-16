@@ -15,7 +15,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, Public } from '../auth/guards/jwt-auth.guard';
 import { SubscriptionGuard, RequireTrialOrActive } from '../auth/guards/subscription.guard';
 import { UserRepository } from '../users/repository/user.repository';
 import { ShopService } from './services/shop.service';
@@ -32,6 +32,7 @@ export class ShopController {
   ) {}
 
   @Get(':handle')
+  @Public()
   @ApiOperation({
     summary: 'Get shop by handle (Public)',
     description: 'Publicly accessible endpoint to retrieve shop information for a given TikTok handle.',
@@ -211,6 +212,7 @@ export class ShopController {
   }
 
   @Post(':handle/view')
+  @Public()
   @ApiOperation({
     summary: 'Track shop view',
     description: 'Public endpoint to track when someone views a shop.',

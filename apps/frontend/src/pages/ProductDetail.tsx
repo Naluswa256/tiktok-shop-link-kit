@@ -24,7 +24,7 @@ const ProductDetail = () => {
 
   // Use the product hook
   const { data: productData, isLoading, error } = useProduct(shopHandle, videoId || '');
-  const product = productData?.data;
+  const product = productData?.data?.data; // API returns nested data structure
 
   // WhatsApp prompt state
   const { isOpen: isWhatsAppPromptOpen, openPrompt: openWhatsAppPrompt, closePrompt: closeWhatsAppPrompt } = useWhatsAppPrompt();
@@ -214,7 +214,7 @@ const ProductDetail = () => {
 
                     {/* Image Indicators */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                      {product.thumbnails.map((_, index) => (
+                      {product.thumbnails.map((_: any, index: number) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
@@ -252,7 +252,7 @@ const ProductDetail = () => {
                 {/* Tags */}
                 {product.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {product.tags.map((tag) => (
+                    {product.tags.map((tag: string) => (
                       <Badge key={tag} variant="secondary" className="text-xs">
                         {tag}
                       </Badge>

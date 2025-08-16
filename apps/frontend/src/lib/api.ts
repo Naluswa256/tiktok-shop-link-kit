@@ -334,10 +334,22 @@ export interface ProductsResponse {
 
 export interface ProductResponse {
   success: boolean;
-  data: AssembledProduct;
+  data: {
+    success: boolean;
+    statusCode: number;
+    message: string;
+    data: AssembledProduct;
+    timestamp: string;
+    path: string;
+    meta: {
+      performance: {
+        responseTime: number;
+      };
+    };
+  };
   message: string;
   timestamp: string;
-  requestId: string;
+  requestId?: string;
 }
 
 // Generic API client function with network error handling

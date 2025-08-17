@@ -192,21 +192,13 @@ const Shop = () => {
                         Owner View
                       </span>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate('/dashboard')}
-                      className="gap-2"
-                    >
-                      Dashboard
-                    </Button>
                   </div>
                 ) : (
-                  // For authenticated users viewing someone else's shop
+                  // For authenticated users viewing someone else's shop - show link to their own shop
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate(`/shop/${user?.shopHandle || user?.tiktokHandle}`)}
                     className="gap-2"
                   >
                     My Shop
@@ -384,7 +376,7 @@ const Shop = () => {
               <div className="space-y-md">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-primary" />
-                  <h3 className="text-base font-semibold text-foreground">Shop Dashboard</h3>
+                  <h3 className="text-base font-semibold text-foreground">Product Overview</h3>
                   {isFirstTimeSignup && (
                     <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">
                       Welcome!
@@ -414,31 +406,7 @@ const Shop = () => {
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate('/dashboard')}
-                    className="flex-1 gap-2"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Full Dashboard
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const shopUrl = `${window.location.origin}/shop/${shopHandle}`;
-                      navigator.clipboard.writeText(shopUrl);
-                      toast.success('Shop link copied to clipboard!');
-                    }}
-                    className="flex-1 gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Shop
-                  </Button>
-                </div>
+
 
                 {isFirstTimeSignup && (
                   <div className="bg-accent/10 rounded-ds-md p-md space-y-sm">

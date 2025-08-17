@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
-import { MessageCircle, Share2, TrendingUp, Video, LogIn } from 'lucide-react';
+import { MessageCircle, Share2, TrendingUp, Video, LogIn, ToggleLeft, ToggleRight, Search, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { SubscriptionPrompt } from '@/components/SubscriptionPrompt';
 import { TrialExpiryModal } from '@/components/SubscriptionGuard';
 import { WhatsAppPrompt, useWhatsAppPrompt } from '@/components/WhatsAppPrompt';
@@ -46,6 +47,11 @@ const Shop = () => {
 
   const products = productsData?.data?.data || [];  // Backend returns data.data array
   const hasProducts = products.length > 0;
+
+  // Calculate product stats for dashboard (TODO: Add isOutOfStock to AssembledProduct interface)
+  const totalProducts = products.length;
+  const availableProducts = products.length; // For now, assume all are available
+  const outOfStockProducts = 0; // For now, assume none are out of stock
   const hasActiveSubscription = subscriptionStatus?.status === 'trial' || subscriptionStatus?.status === 'paid';
 
   // Check if this is a first-time signup flow (coming from subscription selection)
@@ -371,14 +377,14 @@ const Shop = () => {
           </Card>
         )}
 
-        {/* Owner Analytics Section (only for authenticated owners) */}
-        {isOwner && ownerData?.analytics && (
+        {/* Owner Dashboard Section (only for authenticated owners) */}
+        {isOwner && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-lg">
               <div className="space-y-md">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-primary" />
-                  <h3 className="text-base font-semibold text-foreground">Shop Analytics</h3>
+                  <h3 className="text-base font-semibold text-foreground">Shop Dashboard</h3>
                   {isFirstTimeSignup && (
                     <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">
                       Welcome!
@@ -386,31 +392,52 @@ const Shop = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-md">
-                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
+                {/* Product Stats */}
+                <div className="grid grid-cols-3 gap-md">
+                  <div className="text-center p-sm bg-background/50 rounded-lg">
                     <div className="text-lg font-bold text-foreground">
-                      {ownerData.analytics.views_today}
+                      {totalProducts}
                     </div>
-                    <div className="text-xs text-muted-foreground">Today</div>
+                    <div className="text-xs text-muted-foreground">Total Products</div>
                   </div>
-                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
-                    <div className="text-lg font-bold text-foreground">
-                      {ownerData.analytics.views_this_week}
+                  <div className="text-center p-sm bg-background/50 rounded-lg">
+                    <div className="text-lg font-bold text-success">
+                      {availableProducts}
                     </div>
-                    <div className="text-xs text-muted-foreground">This Week</div>
+                    <div className="text-xs text-muted-foreground">Available</div>
                   </div>
-                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
-                    <div className="text-lg font-bold text-foreground">
-                      {ownerData.analytics.views_this_month}
+                  <div className="text-center p-sm bg-background/50 rounded-lg">
+                    <div className="text-lg font-bold text-warning">
+                      {outOfStockProducts}
                     </div>
-                    <div className="text-xs text-muted-foreground">This Month</div>
+                    <div className="text-xs text-muted-foreground">Out of Stock</div>
                   </div>
-                  <div className="text-center p-sm bg-background/50 rounded-ds-sm">
-                    <div className="text-lg font-bold text-foreground">
-                      {ownerData.analytics.total_views}
-                    </div>
-                    <div className="text-xs text-muted-foreground">All Time</div>
-                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/dashboard')}
+                    className="flex-1 gap-2"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Full Dashboard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const shopUrl = `${window.location.origin}/shop/${shopHandle}`;
+                      navigator.clipboard.writeText(shopUrl);
+                      toast.success('Shop link copied to clipboard!');
+                    }}
+                    className="flex-1 gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Shop
+                  </Button>
                 </div>
 
                 {isFirstTimeSignup && (
@@ -504,7 +531,7 @@ const Shop = () => {
                         className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
                         onClick={() => navigate(`/product/${shopHandle}/${product.video_id}`)}
                       >
-                        <div className="aspect-square bg-muted">
+                        <div className="aspect-square bg-muted relative">
                           <img
                             src={product.primary_thumbnail.thumbnail_url}
                             alt={product.title}
@@ -514,6 +541,21 @@ const Shop = () => {
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE2MS4zIDEwMCAxMzAgMTMxLjMgMTMwIDE3MFMxNjEuMyAyNDAgMjAwIDI0MFMyNzAgMjA4LjcgMjcwIDE3MFMyMzguNyAxMDAgMjAwIDEwMFpNMjAwIDIxMEMxNzcuOSAyMTAgMTYwIDE5Mi4xIDE2MCAxNzBTMTc3LjkgMTMwIDIwMCAxMzBTMjQwIDE0Ny45IDI0MCAxNzBTMjIyLjEgMjEwIDIwMCAyMTBaIiBmaWxsPSIjOUI5QkEzIi8+CjxwYXRoIGQ9Ik0zMDAgMzAwSDEwMFYzMzBIMzAwVjMwMFoiIGZpbGw9IiM5QjlCQTMiLz4KPC9zdmc+';
                             }}
                           />
+
+                          {/* Owner Controls - Stock Toggle */}
+                          {isOwner && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // TODO: Implement toggle out of stock functionality
+                                toast.info('Stock management coming soon!');
+                              }}
+                              className="absolute top-2 left-2 p-1 bg-white/90 rounded-full backdrop-blur-sm hover:bg-white transition-colors"
+                              title="Toggle stock status"
+                            >
+                              <ToggleRight className="w-4 h-4 text-success" />
+                            </button>
+                          )}
                         </div>
                         <div className="p-3 space-y-2">
                           <h4 className="text-sm font-medium text-foreground line-clamp-2">
@@ -544,6 +586,18 @@ const Shop = () => {
                                   {tag}
                                 </span>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Owner Status Badge */}
+                          {isOwner && (
+                            <div className="flex items-center justify-between">
+                              <Badge
+                                variant="default"
+                                className="text-xs"
+                              >
+                                Available
+                              </Badge>
                             </div>
                           )}
 

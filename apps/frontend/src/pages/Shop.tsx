@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Layout, Header, Button, PageViewCounter } from '@/components/tiktok-commerce';
+import { Layout, Header, Button } from '@/components/tiktok-commerce';
 import { MessageCircle, Share2, TrendingUp, Video, LogIn, ToggleLeft, ToggleRight, Search, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ const Shop = () => {
   const [shopData, setShopData] = useState<ShopData | null>(null);
   const [ownerData, setOwnerData] = useState<ShopData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewCount, setViewCount] = useState<number>(0);
+
   const [isFirstTimeSignup, setIsFirstTimeSignup] = useState(false);
   const [sellerWhatsAppNumber, setSellerWhatsAppNumber] = useState<string | null>(null);
 
@@ -90,12 +90,7 @@ const Shop = () => {
         setShopData(publicResponse.data);
         setOwnerData(ownerResponse.data);
 
-        // Use owner analytics if available
-        if (ownerResponse.data.analytics) {
-          setViewCount(ownerResponse.data.analytics.total_views || 0);
-        } else if (publicResponse.data.viewCount) {
-          setViewCount(publicResponse.data.viewCount);
-        }
+
 
         if (isFirstTimeSignup) {
           toast.success('Welcome to your shop! You now have access to detailed analytics.');
@@ -106,17 +101,10 @@ const Shop = () => {
         const response = await shopApi.getShopByHandle(handle);
         setShopData(response.data);
 
-        // Update view count from API response
-        if (response.data.viewCount) {
-          setViewCount(response.data.viewCount);
-        }
+
       }
 
-      // Track the view (for all scenarios)
-      await shopApi.trackShopView(handle, {
-        referrer: document.referrer,
-        userAgent: navigator.userAgent,
-      });
+
 
     } catch (error) {
       // If shop not found, show basic shop info
@@ -170,8 +158,6 @@ const Shop = () => {
             title={`@${shopHandle}`}
             actions={
               <div className="flex items-center gap-sm">
-                <PageViewCounter count={viewCount} />
-
                 {/* Show different actions based on user status */}
                 {!isAuthenticated ? (
                   // For non-authenticated users (buyers or potential sellers)
@@ -270,11 +256,6 @@ const Shop = () => {
               <div className="flex items-center gap-1">
                 <span className="font-semibold text-foreground">{products.length}</span>
                 <span className="text-muted-foreground">products</span>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">{viewCount}</span>
-                <span className="text-muted-foreground">views</span>
               </div>
             </div>
 

@@ -456,49 +456,7 @@ const Shop = () => {
           </Card>
         )}
 
-        {/* Sign Up Prompt for Non-Authenticated Users */}
-        {!isAuthenticated && (
-          <Card className="mx-auto max-w-md border-primary/20 bg-primary/5">
-            <CardContent className="p-lg text-center space-y-md">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                <LogIn className="w-6 h-6 text-primary" />
-              </div>
 
-              <div className="space-y-sm">
-                <h3 className="text-base font-semibold text-foreground">
-                  Are you {shopData?.displayName || `@${shopHandle}`}?
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  If this is your TikTok handle, sign in to access your shop dashboard and analytics.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Or create your own shop and start selling from your TikTok videos!
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="primary"
-                  size="block"
-                  onClick={() => navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`)}
-                  className="gap-2"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In as @{shopHandle}
-                </Button>
-                <div className="text-xs text-muted-foreground my-2">or</div>
-                <Button
-                  variant="outline"
-                  size="block"
-                  onClick={() => navigate('/')}
-                  className="gap-2"
-                >
-                  Create My Own Shop
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Products Section - Always visible for public viewing */}
         {hasProducts && (

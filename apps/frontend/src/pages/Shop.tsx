@@ -444,24 +444,12 @@ const Shop = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">Products</h3>
-                  <div className="flex items-center gap-3">
-                    {isOwner && (
-                      <SyncNowButton
-                        size="sm"
-                        variant="outline"
-                        onSyncComplete={() => {
-                          // Refresh products data after sync
-                          window.location.reload();
-                        }}
-                      />
-                    )}
-                    {isOwner && wsStatus.connected && hasActiveSubscription && (
-                      <div className="flex items-center gap-2 text-xs text-success">
-                        <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                        Live updates
-                      </div>
-                    )}
-                  </div>
+                  {isOwner && wsStatus.connected && hasActiveSubscription && (
+                    <div className="flex items-center gap-2 text-xs text-success">
+                      <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                      Live updates
+                    </div>
+                  )}
                 </div>
 
                 {productsLoading ? (

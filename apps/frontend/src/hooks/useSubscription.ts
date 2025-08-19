@@ -111,12 +111,26 @@ export const useSubscriptionTimer = (enabled: boolean = true) => {
   const { data: subscriptionData } = useSubscriptionStatus(enabled);
 
   const getTimeLeft = () => {
-    if (!subscriptionData?.data?.expiresAt) return null;
+    const subscription = subscriptionData?.data;
+    if (!subscription) return null;
 
-    const expiresAt = new Date(subscriptionData.data.expiresAt);
+    // Use trialEndDate for trial users, subscriptionEndDate for paid users
+    let expiresAt: Date | null = null;
+
+    if (subscription.status === 'trial' && subscription.trialEndDate) {
+      expiresAt = new Date(subscription.trialEndDate);
+    } else if (subscription.status === 'paid' && subscription.subscriptionEndDate) {
+      expiresAt = new Date(subscription.subscriptionEndDate);
+    } else if (subscription.expiresAt) {
+      // Fallback to expiresAt if available
+      expiresAt = new Date(subscription.expiresAt);
+    }
+
+    if (!expiresAt) return null;
+
     const now = new Date();
     const diffMs = expiresAt.getTime() - now.getTime();
-    
+
     if (diffMs <= 0) return { expired: true, days: 0, hours: 0, minutes: 0 };
 
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));

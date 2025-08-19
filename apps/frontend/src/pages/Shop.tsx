@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { shopApi, ShopData } from '@/lib/api';
 import { useShopProducts } from '@/hooks/useProducts';
 import { useProductUpdates } from '@/hooks/useProductUpdates';
-import { useTrialExpiryMonitor, useSubscriptionTimer } from '@/hooks/useSubscription';
+import { useTrialExpiryMonitor, useSubscriptionTimer, useSubscriptionGuard } from '@/hooks/useSubscription';
 
 const Shop = () => {
   const navigate = useNavigate();
@@ -45,6 +45,25 @@ const Shop = () => {
   const shouldCheckSubscription = isAuthenticated && isOwner;
   const { isExpired, isWarning, timeLeft, subscriptionStatus } = useTrialExpiryMonitor(shouldCheckSubscription);
   const { formatTimeLeft } = useSubscriptionTimer(shouldCheckSubscription);
+  const { checkSubscription } = useSubscriptionGuard(shouldCheckSubscription);
+
+  // Check subscription status for owners and redirect if expired
+  useEffect(() => {
+    if (shouldCheckSubscription) {
+      const subscriptionCheck = checkSubscription();
+
+      if (!subscriptionCheck.loading && !subscriptionCheck.allowed && subscriptionCheck.expired) {
+        // Redirect expired users to subscription page
+        navigate('/subscription', {
+          state: {
+            returnTo: location.pathname,
+            reason: 'subscription_expired',
+            message: 'Your subscription has expired. Please renew to continue accessing your shop.'
+          }
+        });
+      }
+    }
+  }, [shouldCheckSubscription, checkSubscription, navigate, location.pathname]);
 
   const products = productsData?.data?.data || [];  // Backend returns data.data array
   const hasProducts = products.length > 0;

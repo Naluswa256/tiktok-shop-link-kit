@@ -30,6 +30,7 @@ export interface ApifyRunResult {
   videos: TikTokVideo[];
   totalVideos: number;
   handle: string;
+  cuUsed: number;
 }
 
 export interface ApifyUsageStats {
@@ -128,15 +129,19 @@ export class ApifyService {
       // Get the dataset items
       const videos = await this.getDatasetItems(result.defaultDatasetId);
       
+      // Get actual CU usage
+      const cuUsed = result.stats?.computeUnits || 0.05; // Fallback to conservative estimate
+
       // Update usage tracking
-      this.updateUsageTracking(result.stats?.computeUnits || 10);
-      
-      this.logger.log(`Extracted ${videos.length} videos for handle: ${handle}`);
-      
+      this.updateUsageTracking(cuUsed);
+
+      this.logger.log(`Extracted ${videos.length} videos for handle: ${handle}, CU used: ${cuUsed}`);
+
       return {
         videos,
         totalVideos: videos.length,
         handle,
+        cuUsed,
       };
       
     } catch (error) {

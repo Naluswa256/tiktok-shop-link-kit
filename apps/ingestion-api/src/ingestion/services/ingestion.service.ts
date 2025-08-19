@@ -5,12 +5,11 @@ import {
   ScanCommand,
   PutItemCommand,
   GetItemCommand,
-  QueryCommand,
 } from '@aws-sdk/client-dynamodb';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { ApifyService, TikTokVideo } from './apify.service';
-import { MonitoringService, IngestionMetrics, ErrorMetrics } from './monitoring.service';
+import { MonitoringService, IngestionMetrics } from './monitoring.service';
 
 export interface VideoPostedEvent {
   video_id: string;
@@ -198,7 +197,7 @@ export class IngestionService {
   /**
    * Process a single shop
    */
-  async processShop(shop: Shop): Promise<{ success: boolean; videosFound: number; newVideos: number }> {
+  async processShop(shop: Shop): Promise<{ success: boolean; videosFound: number; newVideos: number; cuUsed: number }> {
     const handle = shop.handle;
     this.logger.log(`Processing shop: ${handle}`);
 
@@ -249,11 +248,12 @@ export class IngestionService {
       });
 
       this.logger.log(`Successfully processed ${handle}: ${eventsEmitted} events emitted`);
-      
+
       return {
         success: true,
         videosFound: trackedVideos.length,
         newVideos: eventsEmitted,
+        cuUsed: extractionResult.cuUsed,
       };
 
     } catch (error) {
@@ -267,6 +267,7 @@ export class IngestionService {
         success: false,
         videosFound: 0,
         newVideos: 0,
+        cuUsed: 0,
       };
     }
   }
@@ -305,7 +306,7 @@ export class IngestionService {
     }
   }
 
-  private async videoExistsInProducts(sellerHandle: string, videoId: string): Promise<boolean> {
+  async videoExistsInProducts(sellerHandle: string, videoId: string): Promise<boolean> {
     try {
       const result = await this.dynamoClient.send(
         new GetItemCommand({
@@ -324,7 +325,7 @@ export class IngestionService {
     }
   }
 
-  private async emitVideoPostedEvent(sellerHandle: string, video: TikTokVideo): Promise<void> {
+  async emitVideoPostedEvent(sellerHandle: string, video: TikTokVideo): Promise<void> {
     const event: VideoPostedEvent = {
       video_id: video.id,
       caption: video.text,

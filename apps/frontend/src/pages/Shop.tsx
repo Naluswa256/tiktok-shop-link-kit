@@ -6,6 +6,7 @@ import { MessageCircle, Share2, TrendingUp, Video, LogIn, ToggleLeft, ToggleRigh
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SubscriptionPrompt } from '@/components/SubscriptionPrompt';
+import SyncNowButton from '@/components/SyncNowButton';
 import { TrialExpiryModal } from '@/components/SubscriptionGuard';
 import { WhatsAppPrompt, useWhatsAppPrompt } from '@/components/WhatsAppPrompt';
 import { useAuth } from '@/contexts/AuthContext';
@@ -387,7 +388,17 @@ const Shop = () => {
                   </div>
                 </div>
 
-
+                {/* Enhanced Sync Instantly Feature */}
+                <div className="space-y-3">
+                  <SyncNowButton
+                    variant="attention"
+                    showAttentionCard={true}
+                    onSyncComplete={() => {
+                      // Refresh products data after sync
+                      window.location.reload();
+                    }}
+                  />
+                </div>
 
                 {isFirstTimeSignup && (
                   <div className="bg-accent/10 rounded-ds-md p-md space-y-sm">
@@ -414,12 +425,24 @@ const Shop = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">Products</h3>
-                  {isOwner && wsStatus.connected && hasActiveSubscription && (
-                    <div className="flex items-center gap-2 text-xs text-success">
-                      <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                      Live updates
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {isOwner && (
+                      <SyncNowButton
+                        size="sm"
+                        variant="outline"
+                        onSyncComplete={() => {
+                          // Refresh products data after sync
+                          window.location.reload();
+                        }}
+                      />
+                    )}
+                    {isOwner && wsStatus.connected && hasActiveSubscription && (
+                      <div className="flex items-center gap-2 text-xs text-success">
+                        <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                        Live updates
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {productsLoading ? (

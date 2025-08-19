@@ -86,8 +86,16 @@ DYNAMODB_SHOPS_TABLE=buylink-prod-shops
 DYNAMODB_PRODUCTS_TABLE=buylink-prod-products
 DYNAMODB_ADMIN_SESSIONS_TABLE=buylink-prod-admin-sessions
 DYNAMODB_INGESTION_STATE_TABLE=buylink-prod-ingestion-state
+USAGE_TABLE_NAME=buylink-prod-seller-usage
+ONBOARDING_SESSIONS_TABLE_NAME=buylink-prod-onboarding-sessions
 SNS_NEW_VIDEO_POSTED_TOPIC_ARN=arn:aws:sns:us-east-1:123456789012:buylink-prod-new-video-posted
 COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+
+# Ingestion Coordinator Configuration
+INGESTION_MAX_CONCURRENT=3
+INGESTION_ON_DEMAND_RATE_LIMIT=10
+INGESTION_SHORT_POLLING_INTERVAL=5
+INGESTION_MONTHLY_CU_CAP=8000
 
 # Secrets (from Secrets Manager)
 COGNITO_CLIENT_ID=<from-secrets-manager>

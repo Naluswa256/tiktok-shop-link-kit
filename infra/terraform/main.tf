@@ -225,6 +225,66 @@ module "dynamodb_tables" {
 
       global_secondary_indexes = []
     }
+
+    seller_usage = {
+      name           = "${local.name_prefix}-seller-usage"
+      hash_key       = "PK"
+      range_key      = "SK"
+      billing_mode   = "PAY_PER_REQUEST"
+      stream_enabled = false
+      ttl_attribute  = "ttl"
+
+      attributes = [
+        { name = "PK", type = "S" },
+        { name = "SK", type = "S" },
+        { name = "EntityType", type = "S" },
+        { name = "handle", type = "S" },
+        { name = "month", type = "S" }
+      ]
+
+      global_secondary_indexes = [
+        {
+          name     = "EntityTypeIndex"
+          hash_key = "EntityType"
+          range_key = "SK"
+        },
+        {
+          name     = "HandleIndex"
+          hash_key = "handle"
+          range_key = "month"
+        }
+      ]
+    }
+
+    onboarding_sessions = {
+      name           = "${local.name_prefix}-onboarding-sessions"
+      hash_key       = "PK"
+      range_key      = "SK"
+      billing_mode   = "PAY_PER_REQUEST"
+      stream_enabled = false
+      ttl_attribute  = "ttl"
+
+      attributes = [
+        { name = "PK", type = "S" },
+        { name = "SK", type = "S" },
+        { name = "EntityType", type = "S" },
+        { name = "handle", type = "S" },
+        { name = "sessionId", type = "S" }
+      ]
+
+      global_secondary_indexes = [
+        {
+          name     = "EntityTypeIndex"
+          hash_key = "EntityType"
+          range_key = "SK"
+        },
+        {
+          name     = "HandleIndex"
+          hash_key = "handle"
+          range_key = "sessionId"
+        }
+      ]
+    }
   }
 
   tags = local.common_tags
@@ -441,9 +501,16 @@ module "ingestion_api_service" {
     DYNAMODB_PRODUCTS_TABLE       = module.dynamodb_tables.table_names["products"]
     ADMIN_SESSIONS_TABLE = module.dynamodb_tables.table_names["admin_sessions"]
     DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_tables.table_names["ingestion_state"]
+    USAGE_TABLE_NAME              = module.dynamodb_tables.table_names["seller_usage"]
+    ONBOARDING_SESSIONS_TABLE_NAME = module.dynamodb_tables.table_names["onboarding_sessions"]
     SNS_NEW_VIDEO_POSTED_TOPIC_ARN = module.sns_topics.topic_arns["new_video_posted"]
     COGNITO_USER_POOL_ID          = module.cognito.user_pool_id
     ADMIN_USERNAME                = "admin@${var.domain_name}"
+    # Ingestion Coordinator Configuration
+    INGESTION_MAX_CONCURRENT      = "3"
+    INGESTION_ON_DEMAND_RATE_LIMIT = "10"
+    INGESTION_SHORT_POLLING_INTERVAL = "5"
+    INGESTION_MONTHLY_CU_CAP      = "8000"
   }
 
   # Secrets from Secrets Manager
@@ -748,6 +815,14 @@ module "parameter_store" {
       description = "DynamoDB Staging table name"
       value       = module.dynamodb_tables.table_names["staging"]
     }
+    "aws/dynamodb/seller_usage_table" = {
+      description = "DynamoDB Seller Usage table name"
+      value       = module.dynamodb_tables.table_names["seller_usage"]
+    }
+    "aws/dynamodb/onboarding_sessions_table" = {
+      description = "DynamoDB Onboarding Sessions table name"
+      value       = module.dynamodb_tables.table_names["onboarding_sessions"]
+    }
 
     # SNS Topic ARNs
     "aws/sns/new_video_posted_topic_arn" = {
@@ -858,6 +933,8 @@ module "eventbridge" {
     DYNAMODB_USERS_TABLE          = module.dynamodb_tables.table_names["users"]
     DYNAMODB_SHOPS_TABLE          = module.dynamodb_tables.table_names["shops"]
     DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_tables.table_names["ingestion_state"]
+    USAGE_TABLE_NAME              = module.dynamodb_tables.table_names["seller_usage"]
+    ONBOARDING_SESSIONS_TABLE_NAME = module.dynamodb_tables.table_names["onboarding_sessions"]
     SNS_NEW_VIDEO_POSTED_TOPIC_ARN = module.sns_topics.topic_arns["new_video_posted"]
     APIFY_TOKEN_SECRET_ARN         = module.secrets_manager.external_apis_secret_arn
   }

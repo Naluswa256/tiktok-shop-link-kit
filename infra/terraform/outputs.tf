@@ -166,6 +166,8 @@ output "application_config" {
     DYNAMODB_ADMIN_SESSIONS_TABLE = module.dynamodb_tables.table_names["admin_sessions"]
     DYNAMODB_INGESTION_STATE_TABLE = module.dynamodb_tables.table_names["ingestion_state"]
     DYNAMODB_STAGING_TABLE = module.dynamodb_tables.table_names["staging"]
+    USAGE_TABLE_NAME              = module.dynamodb_tables.table_names["seller_usage"]
+    ONBOARDING_SESSIONS_TABLE_NAME = module.dynamodb_tables.table_names["onboarding_sessions"]
     
     # SNS Topics
     SNS_NEW_VIDEO_POSTED_TOPIC_ARN = module.sns_topics.topic_arns["new_video_posted"]
